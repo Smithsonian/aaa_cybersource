@@ -106,6 +106,7 @@ class Mailer {
         'from_name' => $site_name,
         'subject' => $subject,
         'body' => $body,
+        'bcc_mail' => 'AAAGiving@si.edu',
       ],
       $site_mail,
     );

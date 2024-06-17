@@ -36,6 +36,7 @@ elements: |-
       '#options_display': buttons
       '#other__type': number
       '#other__option_label': Other
+      '#other__title': 'Other Donation Amount:'
       '#other__placeholder': ''
       '#other__field_prefix': $
       '#other__min': '1'
@@ -50,6 +51,7 @@ elements: |-
         'Greatest Need': 'The Archives'' greatest need'
       '#options_display': buttons
       '#other__option_label': Other
+      '#other__title': 'Where you would like your gift directed:'
       '#other__placeholder': ''
       '#other__field_prefix': '(please specify)'
       '#default_value': 'Greatest Need'
@@ -179,7 +181,6 @@ elements: |-
       '#type': select
       '#title': 'Expiration Year'
       '#options':
-        2022: '2022'
         2023: '2023'
         2024: '2024'
         2025: '2025'

@@ -244,10 +244,13 @@ class DonationWebformHandler extends WebformHandlerBase {
       'email',
     ];
 
+    // Checks for necessary fields on the Gala and Direction fields.
     $checkGala = ['gala'];
+    $isGala = TRUE;
     $this->necessaryFieldCheck($checkGala, $elements);
     if (count($checkGala) > 0) {
       $necessary_fields[] = 'direction';
+      $isGala = FALSE;
     }
 
     $this->necessaryFieldCheck($necessary_fields, $elements);
@@ -263,9 +266,10 @@ class DonationWebformHandler extends WebformHandlerBase {
 
     // Set up client and prepare data.
     $data = $webform_submission->getData();
+    $form_amount = aaa_cybersource_format_amount($data['amount']);
 
-    if (is_null($data['amount']) === TRUE || $data['amount'] < 1) {
-      $form_state->setErrorByName('amount', 'Please specify an amount.');
+    if (is_null($form_amount) === TRUE || $form_amount < 1) {
+      $form_state->setErrorByName('amount', 'Please specify a correct amount using only integers and decimals.');
 
       return;
     }
@@ -285,12 +289,15 @@ class DonationWebformHandler extends WebformHandlerBase {
     }
 
     // Processing option to recurring payments.
-    $processingOptions = [];
+    $processingOptions = $this->cybersourceClient->createProcessingOptions();
     $isRecurring = FALSE;
     if (isset($data['recurring']) && $data['recurring'] == TRUE) {
       $isRecurring = TRUE;
-      $processingOptions = $this->cybersourceClient->createProcessingOptions();
+      $processingOptions = $this->cybersourceClient->createProcessingOptionsForRecurringPayment();
     }
+
+    // Capture when authorized in same transaction.
+    $processingOptions->setCapture(TRUE);
 
     // Client generated code.
     $prefix = $this->getCodePrefix();
@@ -328,7 +335,7 @@ class DonationWebformHandler extends WebformHandlerBase {
       'code' => $data['code'],
     ]);
 
-    $amount = strpos($data['amount'], '.') > 0 ? $data['amount'] : $data['amount'] . '.00';
+    $amount = $this->formatAmountFromWebformData(aaa_cybersource_format_amount($data['amount']));
     $amountDetails = $this->cybersourceClient->createOrderInformationAmountDetails([
       'totalAmount' => $amount,
       'currency' => 'USD',
@@ -352,6 +359,58 @@ class DonationWebformHandler extends WebformHandlerBase {
       'tokenInformation' => $tokenInformation,
     ];
 
+    // Set Merchant defined information.
+    $paymentOrderDetails = [];
+    if ($isGala === TRUE) {
+      $merchantDefinedDataKeyValue = [];
+
+      $i = 1;
+      while (isset($data['gala_0' . $i . '_quantity']) === TRUE) {
+        $twoDigitKey = '0' . $i;
+        $ticketQuantity = $data['gala_' . $twoDigitKey . '_quantity'] > 0 ? $data['gala_' . $twoDigitKey . '_quantity'] : '';
+        $galaTable = $form['elements']['tickets']['gala'];
+        $ticketName = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_ticket_level']['#markup'];
+        $ticketAmount = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_amount']['#markup'];
+
+        $merchantDefinedDataKeyValue[] = $ticketName . ' , Quantity: ' . $ticketQuantity;
+
+        if ($ticketQuantity > 0) {
+          $paymentOrderDetails[] = $ticketName . ' , Quantity: ' . $ticketQuantity . ', at: ' . $ticketAmount;
+        }
+
+        $i++;
+      }
+
+      $merchantDefinedInformation = $this->cybersourceClient->createMerchantDefinedInformation($merchantDefinedDataKeyValue);
+      $requestParameters['merchantDefinedInformation'] = $merchantDefinedInformation;
+    }
+    // Donation form
+    else  {
+      $merchantDefinedDataKeyValue = [];
+
+      if ($data['direction']) {
+        $paymentOrderDetails[] = $merchantDefinedDataKeyValue[] = 'Please direct my gift towards ' . $data['direction'];
+      }
+
+      if ($data['memorial_honorary_gifts'] == TRUE) {
+        $paymentOrderDetails[] = $merchantDefinedDataKeyValue[] = 'Make this gift in ' . strtolower($data['honor_field']) . ' ' . $data['honoree']['first'] . ' ' . $data['honoree']['last'];
+        $paymentOrderDetails[] = $merchantDefinedDataKeyValue[] = 'In ' . ucwords($data['honor_field']) . ' recipient email: ' . $data['honoree_email'];
+      }
+
+      if ($data['no_journal'] == TRUE) {
+        $paymentOrderDetails[] = $merchantDefinedDataKeyValue[] = 'I do not wish to receive the Archives of American Art Journal. I understand that no goods and services will be received for my donation, making it fully tax deductible.';
+      }
+
+      if ($data['recurring'] == TRUE) {
+        $paymentOrderDetails[] = $merchantDefinedDataKeyValue[] = 'This is a monthly recurring transaction.';
+      }
+
+      if (count($merchantDefinedDataKeyValue) > 0) {
+        $merchantDefinedInformation = $this->cybersourceClient->createMerchantDefinedInformation($merchantDefinedDataKeyValue);
+        $requestParameters['merchantDefinedInformation'] = $merchantDefinedInformation;
+      }
+    }
+
     $payRequest = $this->cybersourceClient->createPaymentRequest($requestParameters);
 
     $payResponse = $this->cybersourceClient->createPayment($payRequest);
@@ -370,6 +429,7 @@ class DonationWebformHandler extends WebformHandlerBase {
     $declined = FALSE;
 
     switch ($status) {
+      case 'AUTHORIZED_RISK_DECLINED':
       case 'DECLINED':
         $form_state->setError($form['elements']['payment_details'], 'Your payment request was declined.');
         $context = [
@@ -381,6 +441,11 @@ class DonationWebformHandler extends WebformHandlerBase {
 
       case 'INVALID_REQUEST':
         $form_state->setError($form['elements']['payment_details'], 'Your payment request was invalid.');
+        $declined = TRUE;
+        break;
+
+      case 'SERVER_ERROR':
+        $form_state->setError($form['elements']['payment_details'], 'There was a server error.');
         $declined = TRUE;
         break;
 
@@ -398,6 +463,10 @@ class DonationWebformHandler extends WebformHandlerBase {
     $payment->set('recurring', $isRecurring);
     $payment->set('environment', $environment);
     $payment->set('recurring_active', FALSE);
+
+    if ($isGala === TRUE || isset($paymentOrderDetails)) {
+      $payment->set('order_details_long', implode('; ', $paymentOrderDetails));
+    }
 
     if ($isRecurring === TRUE && $declined !== TRUE) {
       $tokens = $payResponse[0]->getTokenInformation();
@@ -438,7 +507,7 @@ class DonationWebformHandler extends WebformHandlerBase {
     unset($data['microform_container']);
 
     // Add additional message to the confirmation.
-    if ($data['status'] === 'AUTHORIZED') {
+    if ($data['status'] === 'AUTHORIZED' || $data['status'] === 'PENDING') {
       $confirmationMessageId = 'confirmation_message';
       $defaultConfirmationMessage = $this->webform->getSetting($confirmationMessageId, '');
       $message = '<h2>Thank you.</h2><p>Your payment was authorized.<p>' . PHP_EOL . $defaultConfirmationMessage;
@@ -454,7 +523,7 @@ class DonationWebformHandler extends WebformHandlerBase {
       $confirmationMessageId = 'confirmation_message';
       $defaultConfirmationMessage = $this->webform->getSetting($confirmationMessageId, '');
 
-      $message = '<h2>Thank you.</h2><p>Your payment is authorized and pending review.</p>';
+      $message = '<h2>Thank you.</h2><p>Your payment is authorized pending review.</p>';
 
       if ($this->configuration['email_receipt'] === TRUE) {
         $message = $message . PHP_EOL . '<p>You will receive an email copy of your receipt once processed.</p>';
@@ -476,9 +545,13 @@ class DonationWebformHandler extends WebformHandlerBase {
 
       $data = $webform_submission->getData();
       $payment = $this->entityRepository->getActive('payment', $data['payment_entity']);
-      $key = $this->getWebform()->id() . '_' . $this->getHandlerId();
-      $to = $this->replaceTokens('[webform_submission:values:email]', $webform_submission, [], []);
-      $this->receiptHandler->trySendReceipt($this->cybersourceClient, $payment, $key, $to);
+
+      // Only send email in these cases.
+      if ($data['status'] === 'AUTHORIZED' || $data['status'] === 'PENDING' || $data['status'] === 'TRANSMITTED') {
+        $key = $this->getWebform()->id() . '_' . $this->getHandlerId();
+        $to = $this->replaceTokens('[webform_submission:values:email]', $webform_submission, [], []);
+        $this->receiptHandler->trySendReceipt($this->cybersourceClient, $payment, $key, $to);
+      }
     }
   }
 
@@ -605,6 +678,17 @@ class DonationWebformHandler extends WebformHandlerBase {
     else {
       return $prefix;
     }
+  }
+
+  /**
+   * Formats the amount received from the form.
+   *
+   * @param string $dataAmount
+   *
+   * @return string
+   */
+  private function formatAmountFromWebformData(string $dataAmount) {
+    return strpos($dataAmount, '.') > 0 ? $dataAmount : $dataAmount . '.00';
   }
 
 }

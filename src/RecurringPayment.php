@@ -101,8 +101,46 @@ class RecurringPayment {
       ->condition('payment_id', NULL, 'IS NOT NULL')
       // Must have customer stored.
       ->condition('customer_id', NULL, 'IS NOT NULL')
+      // Initial payment must have been Transmitted.
+      ->condition('status', 'TRANSMITTED')
       // Stored recurring_next date must be passed.
       ->condition('recurring_next', gmdate($this->dateTimeFormat), '<')
+      ->execute();
+  }
+
+  /**
+   * Get list of recurring payments but missing customer.
+   *
+   * @return array
+   *   List of Payments.
+   */
+  public function queryMissingCustomer() {
+    return $this->storage->getQuery()
+      // Recurring only.
+      ->condition('recurring', 1)
+      // Recurring is active.
+      ->condition('recurring_active', 1)
+      // Must have payment id.
+      ->condition('payment_id', NULL, 'IS NOT NULL')
+      // Must have customer stored.
+      ->condition('customer_id', NULL, 'IS NULL')
+      ->execute();
+  }
+
+    /**
+   * Get list of recurring payments but missing customer.
+   *
+   * @return array
+   *   List of Payments.
+   */
+  public function queryMissingPaymentId() {
+    return $this->storage->getQuery()
+      // Recurring only.
+      ->condition('recurring', 1)
+      // Recurring is active.
+      ->condition('recurring_active', 1)
+      // Must have payment id.
+      ->condition('payment_id', NULL, 'IS NULL')
       ->execute();
   }
 
@@ -140,7 +178,8 @@ class RecurringPayment {
     // Set up the payment request.
     $this->cybersourceClient->setEnvironment($environment);
 
-    $processingOptions = $this->cybersourceClient->createProcessingOptions($payment_id);
+    $processingOptions = $this->cybersourceClient->createProcessingOptionsForRecurringPayment($payment_id);
+    $processingOptions->setCapture(TRUE);
 
     $newCode = $code . '-' . ($recurring_payments_count + 1);
     $clientReferenceInformation = $this->cybersourceClient->createClientReferenceInformation([
@@ -201,13 +240,7 @@ class RecurringPayment {
     $newPayment->set('environment', $environment);
     $newPayment->set('recurring_active', FALSE);
 
-    if ($isRecurring === TRUE) {
-      $tokens = $payResponse[0]->getTokenInformation();
-      $customer = $tokens->getCustomer();
-      $newPayment->set('customer_id', $customer->getId());
-      $newPayment->set('recurring_active', TRUE);
-    }
-
+    // Save new payment entity.
     $newPayment->save();
     $pid = $newPayment->id();
 
@@ -240,6 +273,49 @@ class RecurringPayment {
     $this->receiptHandler->trySendReceipt($this->cybersourceClient, $newPayment, $key);
 
     return TRUE;
+  }
+
+  public function checkForCustomerId(Payment $payment) {
+    $payment_id = $payment->get('payment_id')->value;
+    $environment = $payment->get('environment')->value;
+
+    $this->cybersourceClient->setEnvironment($environment);
+
+    $transaction = $this->cybersourceClient->getTransaction($payment_id);
+
+    $customerId = $transaction[0]->getPaymentInformation()->getCustomer()->getCustomerId();
+
+    if (!is_null($customerId)) {
+      $payment->set('customer_id', $customerId);
+      $payment->save();
+    }
+  }
+
+  public function checkForPaymentId(Payment $payment) {
+    $code = $payment->get('code')->value;
+    $environment = $payment->get('environment')->value;
+
+    $this->cybersourceClient->setEnvironment($environment);
+
+    $search = [
+      'query' => 'clientReferenceInformation.code:' . $code,
+      'sort' => 'submitTimeUtc:desc',
+      'offset' => '0',
+      'limit' => '1'
+    ];
+
+    $createSearchRequest = $this->cybersourceClient->createSearchRequest($search);
+
+    $searchRequest = $this->cybersourceClient->createSearch($createSearchRequest);
+
+    $transactions = $searchRequest[0]->getEmbedded()->getTransactionSummaries();
+
+    if (count($transactions) > 0) {
+      $paymentId = $transactions[0]->getId();
+
+      $payment->set('payment_id', $paymentId);
+      $payment->save();
+    }
   }
 
 }

@@ -36,7 +36,6 @@ elements: |-
           '#type': number
           '#title': 'Quanity Benefactor'
           '#title_display': none
-          '#size': '3'
           '#attributes':
             data-amount: 25000
           '#min': 0
@@ -130,6 +129,7 @@ elements: |-
       '#type': textfield
       '#title': 'Total Amount'
       '#field_prefix': $
+      '#readonly': true
     gala_name:
       '#type': textfield
       '#title': 'Please list your name as you would like to be recognized in Gala materials:'
@@ -215,7 +215,6 @@ elements: |-
       '#type': select
       '#title': 'Expiration Year'
       '#options':
-        2022: '2022'
         2023: '2023'
         2024: '2024'
         2025: '2025'
@@ -369,6 +368,8 @@ settings:
   wizard_toggle: false
   wizard_toggle_show_label: ''
   wizard_toggle_hide_label: ''
+  wizard_page_type: container
+  wizard_page_title_tag: h2
   preview: 0
   preview_label: ''
   preview_title: ''
@@ -387,7 +388,7 @@ settings:
   confirmation_type: inline
   confirmation_url: '[webform:url]/receipt'
   confirmation_title: 'Thank you'
-  confirmation_message: 'Thank you very much for your donation. You may save a copy of a receipt for your records <a href="[webform:url]/receipt?token=[webform_submission:token]">here</a>.'
+  confirmation_message: "Thank you for your support of the 2023 Archives of American Art Gala.&nbsp; The estimated fair-market value of goods and services for table purchases is $4,060 for Benefactor, $3,285 for Patron, and $2,635 for Partner. Fair-market value for all ticket purchases is $360.&nbsp; If you have any questions about your gift, please contact us at <a href=\"mailto:AAAGala@si.edu\" target=\"_blank\"><em>AAAGala@si.edu</em></a> or (202) 633-7989.&nbsp; We look forward to seeing you in New York City on Tuesday, October 24.<br />\r\n<br />\r\nYou may save a copy of a receipt for your records <a href=\"[webform:url]/receipt?token=[webform_submission:token]\">here</a>."
   confirmation_attributes: {  }
   confirmation_back: true
   confirmation_back_label: ''
@@ -416,8 +417,6 @@ settings:
   token_update: false
   token_delete: false
   serial_disabled: false
-  wizard_page_type: container
-  wizard_page_title_tag: h2
 access:
   create:
     roles:

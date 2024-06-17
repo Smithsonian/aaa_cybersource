@@ -13,13 +13,16 @@ aaa_cybersource.settings_form:
   requirements:
     _permission: 'administer aaa_cybersource settings'
 aaa_cybersource.token:
-  path: '/admin/config/cybersource/token/{webform}'
+  path: '/api/cybersource/token/{webform}'
   defaults:
     _controller: \Drupal\aaa_cybersource\Controller\Cybersource::getFlexToken
-    webform: ''
   methods: [GET]
   requirements:
     _access: 'TRUE'
+  options:
+    parameters:
+      webform:
+        type: entity:webform
 aaa_cybersource.manage_templates:
   path: '/admin/config/cybersource/templates'
   defaults:
@@ -57,3 +60,10 @@ entity.payment.settings:
     _title: 'Payment'
   requirements:
     _permission: 'administer payment'
+aaa_cybersource.logging:
+  path: '/api/cybersource/logging'
+  defaults:
+    _title: 'Logging'
+    _controller: '\Drupal\aaa_cybersource\Controller\CybersourceLogging::logMessage'
+  requirements:
+    _permission: 'access content'

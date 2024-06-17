@@ -167,6 +167,13 @@ class SettingsForm extends ConfigFormBase {
       '#default_value' => $config->get('global')['receipt_availibility'] ?? 7,
     ];
 
+    $form['global']['fieldset']['logging'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Enable debug logging'),
+      '#description' => $this->t('Logs users events from the payment form to drupal logs in order to follow user pathways.'),
+      '#default_value' => $config->get('global')['logging'] ?? FALSE,
+    ];
+
     $form['global']['development'] = [
       '#type' => 'fieldset',
       '#title' => $this->t('Development account settings.'),
@@ -257,6 +264,7 @@ class SettingsForm extends ConfigFormBase {
       ],
       'receipt_availibility' => $form_state->getValue('receipt_availibility', $global['receipt_availibility'] ?? 7),
       'receipt_sender' => $form_state->getValue('receipt_sender', $global['receipt_sender'] ?? ''),
+      'logging' => $form_state->getValue('logging', $global['logging'] ?? FALSE),
     ]);
 
     $config->save();

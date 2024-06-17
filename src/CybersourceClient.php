@@ -6,32 +6,39 @@ use CyberSource\ApiClient;
 use CyberSource\ApiException;
 use CyberSource\Configuration;
 
+use CyberSource\Api\CaptureApi;
 use CyberSource\Api\CustomerApi;
 use CyberSource\Api\CustomerPaymentInstrumentApi;
 use CyberSource\Api\InstrumentIdentifierApi;
 use CyberSource\Api\MicroformIntegrationApi;
 use CyberSource\Api\PaymentsApi;
 use CyberSource\Api\PaymentInstrumentApi;
+use CyberSource\Api\SearchTransactionsApi;
 use CyberSource\Api\TransactionDetailsApi;
 
 use CyberSource\Authentication\Core\MerchantConfiguration;
 
 use CyberSource\Logging\LogConfiguration;
 
+use CyberSource\Model\CapturePaymentRequest;
 use CyberSource\Model\CreatePaymentRequest;
+use CyberSource\Model\CreateSearchRequest;
 use CyberSource\Model\GenerateCaptureContextRequest;
 use CyberSource\Model\Ptsv2paymentsOrderInformation;
 use CyberSource\Model\Ptsv2paymentsTokenInformation;
 use CyberSource\Model\PostInstrumentIdentifierRequest;
+use CyberSource\Model\Ptsv2paymentsidcapturesOrderInformation;
 use CyberSource\Model\Ptsv2paymentsPaymentInformation;
 use CyberSource\Model\Ptsv2paymentsProcessingInformation;
 use CyberSource\Model\Ptsv2paymentsOrderInformationBillTo;
 use CyberSource\Model\Ptsv2paymentsOrderInformationShipTo;
 use CyberSource\Model\Ptsv2paymentsClientReferenceInformation;
+use CyberSource\Model\Ptsv2paymentsMerchantDefinedInformation;
 use CyberSource\Model\Ptsv2paymentsPaymentInformationCustomer;
 use CyberSource\Model\Ptsv2paymentsOrderInformationAmountDetails;
 use CyberSource\Model\Tmsv2customersEmbeddedDefaultPaymentInstrumentCard;
 use CyberSource\Model\Tmsv2customersEmbeddedDefaultPaymentInstrumentBillTo;
+use CyberSource\Model\Ptsv2paymentsidcapturesOrderInformationAmountDetails;
 use CyberSource\Model\Ptsv2paymentsProcessingInformationAuthorizationOptions;
 use CyberSource\Model\Ptsv2paymentsProcessingInformationAuthorizationOptionsInitiator;
 use CyberSource\Model\Tmsv2customersEmbeddedDefaultPaymentInstrumentInstrumentIdentifier;
@@ -214,7 +221,6 @@ class CybersourceClient {
     if (is_null($global) === FALSE) {
       // Initialize with development host until ready.
       $this->setRequestHost('apitest.cybersource.com');
-
       $this->setAuth($global['auth']);
       $this->setMerchantId($global[$global['environment']]['merchant_id']);
       $this->setMerchantKey($global[$global['environment']]['merchant_key']);
@@ -475,14 +481,25 @@ class CybersourceClient {
   }
 
   /**
-   * Necessary for a MIT.
+   * Creates processing options object.
+   *
+   * @return Ptsv2paymentsProcessingInformation
+   */
+  public function createProcessingOptions() {
+    return new Ptsv2paymentsProcessingInformation([]);
+  }
+
+  /**
+   * Create processing options for recurring payments.
+   *
+   * Necessary for future MIT.
    *
    * @param string $previousId
    *   Set this value if this is a subsequent recurring payment.
    *
-   * @return Ptsv2paymentsProcessingInformationAuthorizationOptionsInitiator
+   * @return Ptsv2paymentsProcessingInformation
    */
-  public function createProcessingOptions($previousId = '') {
+  public function createProcessingOptionsForRecurringPayment($previousId = '') {
     // First MIT recurring payment.
     if (empty($previousId) === TRUE) {
       $subsequentPayment = FALSE;
@@ -634,6 +651,8 @@ class CybersourceClient {
    *   The environment name.
    */
   public function setEnvironment(string $env) {
+    $this->setReady(FALSE);
+
     if (!isset($this->merchantConfiguration)) {
       return;
     }
@@ -648,7 +667,34 @@ class CybersourceClient {
       $this->setRequestHost('apitest.cybersource.com');
     }
 
-    $this->merchantConfiguration->setRunEnvironment($this->requestHost);
+    // Update client settings.
+    $configurationSettings = $this->configFactory->get('aaa_cybersource.settings');
+    $global = $configurationSettings->get('global');
+    $environmentalSettings = $global[$env];
+
+    $this->setMerchantId($environmentalSettings['merchant_id']);
+    $this->setMerchantKey($environmentalSettings['merchant_key']);
+    $this->setMerchantSecretKey($environmentalSettings['merchant_secret']);
+
+    // Find and set certificate file.
+    $file = $this->entityRepository->getActive('file', $environmentalSettings['certificate']['fid']);
+    $uri = $file->getFileUri();
+    $dir = $this->fileSystem->dirname($uri);
+    $realpath = $this->fileSystem->realpath($dir);
+    $this->setCertificateDirectory($realpath . DIRECTORY_SEPARATOR);
+    $this->setCertificateFile(explode('.', $this->fileSystem->basename($uri))[0]);
+
+    $this->apiClient->getConfig()->setHost($this->requestHost);
+
+    $this->setupSettings();
+    $this->setupMerchantConfig();
+
+    // Set new client.
+    $api_client = new ApiClient($this->settings, $this->merchantConfiguration);
+    $this->setApiClient($api_client);
+
+    // Ready
+    $this->setReady(TRUE);
   }
 
   /**
@@ -715,6 +761,106 @@ class CybersourceClient {
   }
 
   /**
+   * Capture an authorized payment.
+   *
+   * @param string $payment_id
+   *   The id of the authorization.
+   * @param string $code
+   *   The merchant generated code.
+   * @param string $amount
+   *   The string amount in USD.
+   * @return void
+   */
+  public function capturePayment(string $payment_id, string $code, string $amount) {
+    $clientReferenceInformationArr = [
+      "code" => $code,
+    ];
+
+    $clientReferenceInformation = new Ptsv2paymentsClientReferenceInformation($clientReferenceInformationArr);
+
+    $orderInformationAmountDetailsArr = [
+      "totalAmount" => $amount,
+      "currency" => "USD"
+    ];
+
+    $orderInformationAmountDetails = new Ptsv2paymentsidcapturesOrderInformationAmountDetails($orderInformationAmountDetailsArr);
+
+    $orderInformationArr = [
+      "amountDetails" => $orderInformationAmountDetails
+    ];
+
+    $orderInformation = new Ptsv2paymentsidcapturesOrderInformation($orderInformationArr);
+
+    $requestObjArr = [
+      "clientReferenceInformation" => $clientReferenceInformation,
+      "orderInformation" => $orderInformation
+    ];
+
+    $requestObj = new CapturePaymentRequest($requestObjArr);
+    $api_instance = new CaptureApi($this->apiClient);
+
+    try {
+      $api_response = $api_instance->capturePayment($requestObj, $payment_id);
+
+      return $api_response[0];
+    }
+    catch (ApiException $e) {
+      print_r($e->getResponseBody());
+      print_r($e->getMessage());
+
+      return '';
+    }
+  }
+
+  /**
+   * Creates merchant defined information for the payment request.
+   *
+   * @param array $information
+   *
+   * @return Ptsv2paymentsMerchantDefinedInformation[] $return
+   */
+  public function createMerchantDefinedInformation(array $information) {
+    $return = [];
+
+    // Cybersource index starts at 1, ignore existing keys.
+    $i = 1;
+    foreach ($information as $key => $value) {
+      $return[] = new Ptsv2paymentsMerchantDefinedInformation([
+        'key' => $i,
+        'value' => $value,
+      ]);
+
+      $i++;
+    }
+
+    return $return;
+  }
+
+  /**
+   * Creates and returns a Transactions search request.
+   *
+   * @param array $data
+   * @return CreateSearchRequest
+   */
+  public function createSearchRequest(array $data) {
+    return new CreateSearchRequest($data);
+  }
+
+  /**
+   * Processes a Transaction search.
+   *
+   * @param CreateSearchRequest $csr
+   * @return array $result
+   */
+  public function createSearch(CreateSearchRequest $csr) {
+    $api_instance = new SearchTransactionsApi($this->apiClient);
+    $api_instance->setApiClient($this->apiClient);
+    $result = $api_instance->createSearch($csr);
+
+    return $result;
+  }
+
+  /**
    * CyberSource client settings.
    */
   private function setupSettings() {
@@ -746,6 +892,7 @@ class CybersourceClient {
     $merchantConfiguration->setKeyPassword('');
     $merchantConfiguration->setUseMetaKey(FALSE);
     $merchantConfiguration->setRunEnvironment($this->requestHost);
+    $merchantConfiguration->setIntermediateHost($this->requestHost);
 
     $this->setMerchantConfiguration($merchantConfiguration);
   }

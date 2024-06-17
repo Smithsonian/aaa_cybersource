@@ -39,7 +39,7 @@ class Receipts {
 
   /**
    * Queue.
-   * 
+   *
    * @var \Drupal\Core\Queue\QueueFactory
    */
   protected $queue;
@@ -112,6 +112,7 @@ class Receipts {
     $card = $paymentInformation->getCard();
     $amountDetails = $transaction[0]->getOrderInformation()->getAmountDetails();
     $datetime = $transaction[0]->getSubmitTimeUTC();
+    $donationType = strpos($payment->get('code')->value, 'GALA') > -1 ? 'GALA' : 'DONATION';
 
     // Build receipt.
     $build['title'] = [
@@ -134,6 +135,14 @@ class Receipts {
       '#type' => 'html_tag',
       '#tag' => 'div',
       '#value' => t('Order Number: :number', [':number' => $payment->get('code')->value]),
+      '#attributes' => [
+        'style' => ['margin-bottom: 25px'],
+      ],
+    ];
+
+    $build['break_1'] = [
+      '#type' => 'html_tag',
+      '#tag' => 'hr',
     ];
 
     $build['billing_information'] = [
@@ -299,6 +308,41 @@ class Receipts {
       ]),
     ];
 
+    if ($donationType === 'GALA' || !is_null($payment->get('order_details_long')->value)) {
+      $build['order_details'] = [
+        '#type' => 'container',
+        '#attributes' => [
+          'class' => ['order-details'],
+        ],
+      ];
+
+      $build['order_details']['title'] = [
+        '#type' => 'html_tag',
+        '#tag' => 'h2',
+        '#value' => t('Order Details'),
+      ];
+
+      $build['order_details']['content'] = [
+        '#type' => 'container',
+      ];
+
+      $details = explode('; ', $payment->get('order_details_long')->value);
+
+      foreach ($details as $i => $detail) {
+        $build['order_details']['content'][$i] = [
+          '#type' => 'html_tag',
+          '#tag' => 'div',
+          '#value' => $detail,
+        ];
+
+        if ($i === count($details) - 1) {
+          $build['order_details']['content'][$i]['#attributes'] = [
+            'style' => ['margin-bottom: 25px'],
+          ];
+        }
+      }
+    }
+
     $build['total'] = [
       '#type' => 'container',
     ];
@@ -309,11 +353,40 @@ class Receipts {
       '#value' => t('Total Amount'),
     ];
 
-    $amount = strpos($amountDetails->getTotalAmount(), '.') > 0 ? $amountDetails->getTotalAmount() : $amountDetails->getTotalAmount() . '.00';
+    $amount = number_format($amountDetails->getTotalAmount(), 2);
     $build['total']['amount'] = [
       '#type' => 'html_tag',
       '#tag' => 'div',
       '#value' => t('$:amount', [':amount' => $amount]),
+      '#attributes' => [
+        'style' => ['margin-bottom: 25px'],
+      ],
+    ];
+
+    $build['break_2'] = [
+      '#type' => 'html_tag',
+      '#tag' => 'hr',
+    ];
+
+    $build['message'] = [
+      '#type' => 'container',
+    ];
+
+    if ($donationType === 'GALA') {
+      $markup = "<p>Thank you for your support of the 2023 Archives of American Art Gala.  The estimated fair-market value of goods and services for table purchases is $4,060 for Benefactor, $3,285 for Patron, and $2,635 for Partner. Fair-market value for all ticket purchases is $360.  If you have any questions about your gift, please contact us at <a>AAAGala@si.edu</a> or (202) 633-7989.  We look forward to seeing you in New York City on Tuesday, October 24.</p>";
+    }
+    else {
+      $markup = "<p>Thank you for supporting the Archives of American Art. By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. Unless you opted out of receiving it, donors of at least $250 will receive the Archives of American Art Journal, with goods and services valued at $35. Gifts less than $250 or greater than $1,750 are fully tax deductible. Should you have any questions about your donation, you can reach us at <a>AAAGiving@si.edu</a> or (202) 633-7989.</p>";
+    }
+
+    $build['message']['title'] = [
+      '#type' => 'html_tag',
+      '#tag' => 'h2',
+      '#value' => t('Thank You'),
+    ];
+
+    $build['message']['message'] = [
+      '#markup' => $markup,
     ];
 
     return $build;
@@ -342,67 +415,83 @@ class Receipts {
    */
   public function buildReceiptEmailBody(Payment $payment, $billTo, $paymentInformation, $amountDetails, $datetime) {
     $card = $paymentInformation->getCard();
-    $amount = strpos($amountDetails->getAuthorizedAmount(), '.') > 0 ? $amountDetails->getAuthorizedAmount() : $amountDetails->getAuthorizedAmount() . '.00';
-
+    $amount = number_format($amountDetails->getAuthorizedAmount(), 2);
     $donationType = strpos($payment->get('code')->value, 'GALA') > -1 ? 'GALA' : 'DONATION';
 
     $body = '';
 
-    $body .= "
-      Thank you for your support of the Archives of American Art.
+    if ($donationType === 'DONATION') {
+$body .= "
+Thank you for supporting the Archives of American Art. By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. Unless you opted out of receiving it, donors of at least $250 will receive the Archives of American Art Journal, with goods and services valued at $35. Gifts less than $250 or greater than $1,750 are fully tax deductible. Should you have any questions about your donation, you can reach us at AAAGiving@si.edu or (202) 633-7989.
+";
+    } else if ($donationType === 'GALA') {
+$body .= "
+Thank you for your support of the 2023 Archives of American Art Gala.  The estimated fair-market value of goods and services for table purchases is $4,060 for Benefactor, $3,285 for Patron, and $2,635 for Partner. Fair-market value for all ticket purchases is $360.  If you have any questions about your gift, please contact us at AAAGala@si.edu or (202) 633-7989.  We look forward to seeing you in New York City on Tuesday, October 24.
+";
+    }
 
-      RECEIPT
+$body .= "
+RECEIPT
 
-      Date: {$this->dateFormatter->format(strtotime($datetime), 'long')}
-      Order Number: {$payment->get('code')->value}
+Date: {$this->dateFormatter->format(strtotime($datetime), 'long')}
+Order Number: {$payment->get('code')->value}
 
-      ------------------------------------
+------------------------------------
 
-      BILLING INFORMATION
+BILLING INFORMATION
 
-      {$billTo->getFirstName()} {$billTo->getLastName()}";
+{$billTo->getFirstName()} {$billTo->getLastName()}";
 
     if (!empty($billTo->getCompany())) {
-      $body .= "
-      {$billTo->getCompany()}";
+$body .= "
+{$billTo->getCompany()}";
     }
 
-    $body .= "
-      {$billTo->getAddress1()}";
+$body .= "
+{$billTo->getAddress1()}";
 
     if (!empty($billTo->getAddress2())) {
-      $body .= "
-      {$billTo->getAddress2()}";
+$body .= "
+{$billTo->getAddress2()}";
     }
 
-    $body .= "
-      {$billTo->getLocality()}
-      {$billTo->getAdministrativeArea()}
-      {$billTo->getPostalCode()}
-      {$billTo->getEmail()}
-      {$billTo->getPhoneNumber()}
+$body .= "
+{$billTo->getLocality()}
+{$billTo->getAdministrativeArea()}
+{$billTo->getPostalCode()}
+{$billTo->getEmail()}
+{$billTo->getPhoneNumber()}
 
-      PAYMENT DETAILS
-      Card Type {$this->cardTypeNumberToString($card->getType())}
-      Card Number xxxxxxxxxxxxx{$card->getSuffix()}
-      Expiration {$card->getExpirationMonth()}-{$card->getExpirationYear()}
+------------------------------------
 
-      TOTAL AMOUNT
-      $ {$amount}
-      ";
+PAYMENT DETAILS
 
-    if ($donationType === 'DONATION') {
-    $body .= "
-      
-      Thank you for supporting the Archives of American Art. By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. Unless you opted out of receiving it, donors of at least $250 will receive the Archives of American Art Journal, with goods and services valued at $35. Gifts less than $250 or greater than $1,750 are fully tax deductible. Should you have any questions about your donation, you can reach us at AAAGiving@si.edu or (202) 633-7989.
-      ";
+Card Type {$this->cardTypeNumberToString($card->getType())}
+Card Number xxxxxxxxxxxxx{$card->getSuffix()}
+Expiration {$card->getExpirationMonth()}-{$card->getExpirationYear()}
+
+------------------------------------
+";
+
+    if ($donationType === 'GALA' || !is_null($payment->get('order_details_long')->value)) {
+      $details = explode('; ', $payment->get('order_details_long')->value);
+
+$body .= "
+ORDER DETAILS
+";
+
+      foreach ($details as $detail) {
+$body .= "
+{$detail}
+";
+      }
     }
-    else if ($donationType === 'GALA') {
-    $body .= "
-      
-      Thank you for supporting the Archives of American Art through the purchase of tickets to our 2023 Gala! By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. A tax receipt will be emailed to you. Should you have any questions, please contact AAAGiving@si.edu or (202) 633-7989.
-      ";
-    }
+
+$body .= "
+TOTAL AMOUNT
+
+$ {$amount}
+";
 
     return $body;
   }

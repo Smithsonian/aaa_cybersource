@@ -5,6 +5,9 @@
  * Install/uninstall module hooks for aaa_cybersource module.
  */
 
+use Drupal\aaa_cybersource\Entity\Payment;
+use Drupal\Core\Field\BaseFieldDefinition;
+
 /**
  * Implements hook_uninstall().
  */
@@ -18,4 +21,132 @@ function aaa_cybersource_uninstall() {
       $webform_entity->delete();
     }
   }
+}
+
+/**
+ * Add reconciliation information.
+ */
+function aaa_cybersource_update_9001() {
+  $securePaymentId = BaseFieldDefinition::create('string')
+    ->setLabel(t('Secure Payment ID'))
+    ->setDescription(t('The ID returned by Cybersource after a payment is secured.'))
+    ->setDisplayOptions('view', [
+      'type' => 'string',
+      'label' => 'above',
+      'weight' => 2,
+      'settings' => [
+        'link_to_entity' => FALSE,
+      ],
+    ])
+    ->setDisplayConfigurable('view', TRUE);
+
+  $transactionId = BaseFieldDefinition::create('string')
+    ->setLabel(t('Transaction Reference Number'))
+    ->setDescription(t('The reference ID of the credit card settlement. Also refered to as the reconciliation ID.'))
+    ->setDisplayOptions('view', [
+      'type' => 'string',
+      'label' => 'above',
+      'weight' => 2,
+      'settings' => [
+        'link_to_entity' => FALSE,
+      ],
+    ])
+    ->setDisplayConfigurable('view', TRUE);
+
+  $edum = \Drupal::entityDefinitionUpdateManager();
+  $edum->installFieldStorageDefinition('secure_payment_id', 'payment', 'payment', $securePaymentId);
+  $edum->installFieldStorageDefinition('transaction_id', 'payment', 'payment', $transactionId);
+}
+
+/**
+ * Secure past authorizations.
+ */
+function aaa_cybersource_update_9002() {
+  $authorized_payments = \Drupal::entityQuery('payment')
+  ->condition('status', 'AUTHORIZED')
+  ->condition('secure_payment_id', NULL, 'IS NULL')
+  ->condition('transaction_id', NULL, 'IS NULL')
+  ->condition('recurring_active', FALSE)
+  ->sort('changed', 'DESC')
+  ->range(0, 10)
+  ->execute();
+
+  $payments = Payment::loadMultiple($authorized_payments);
+  $cybersourceClient = \Drupal::service('aaa_cybersource.cybersource_client');
+
+  foreach ($payments as $payment) {
+    $environment = $payment->get('environment')->value;
+    $id = $payment->get('payment_id')->value;
+    $code = $payment->get('code')->value;
+    $amount = $payment->get('authorized_amount')->value;
+
+    $cybersourceClient->setEnvironment($environment);
+
+    // Don't run this again.
+    // $captureResponse = $cybersourceClient->capturePayment($id, $code, $amount);
+    $captureResponse = NULL;
+
+    if (!empty($captureResponse)) {
+      $payment->set('secure_payment_id', $captureResponse->getId());
+      $payment->set('transaction_id', $captureResponse->getReconciliationId());
+      $payment->set('status', $captureResponse->getStatus());
+
+      $payment->save();
+    }
+  }
+}
+
+/**
+ * Add purchase information field.
+ */
+function aaa_cybersource_update_9004() {
+  $orderDetails = BaseFieldDefinition::create('string')
+    ->setLabel(t('Order details'))
+    ->setDescription(t('Specific details regarding the order. Important for Gala tickets.'))
+    ->setDisplayOptions('view', [
+      'type' => 'string',
+      'label' => 'above',
+      'weight' => 2,
+      'settings' => [
+        'link_to_entity' => FALSE,
+      ],
+    ])
+    ->setDisplayConfigurable('view', TRUE);
+
+  $edum = \Drupal::entityDefinitionUpdateManager();
+  $edum->installFieldStorageDefinition('order_details', 'payment', 'payment', $orderDetails);
+}
+
+/**
+ * Order details needs a different field type.
+ */
+function aaa_cybersource_update_9006() {
+  // Install new field.    
+  $orderDetails = BaseFieldDefinition::create('string_long')
+    ->setLabel(t('Order details'))
+    ->setDescription(t('Specific details regarding the order.'))
+    ->setDisplayOptions('view', [
+      'type' => 'string',
+      'label' => 'above',
+      'weight' => 2,
+    ])
+    ->setDisplayConfigurable('view', TRUE);
+
+  $edum = \Drupal::entityDefinitionUpdateManager();
+  $edum->installFieldStorageDefinition('order_details_long', 'payment', 'payment', $orderDetails);
+
+  // Collect existing data and add it to new field.
+  $payments_with_data = \Drupal::entityQuery('payment')
+  ->condition('order_details', NULL, 'IS NOT NULL')
+  ->sort('changed', 'DESC')
+  ->execute();
+
+  $payments = Payment::loadMultiple($payments_with_data);
+
+  foreach ($payments as $payment) {
+    $currentOrderDetailsValue = $payment->get('order_details')->value;
+    $payment->set('order_details_long', $currentOrderDetailsValue);
+    $payment->save();
+  }
+
 }

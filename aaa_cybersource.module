@@ -7,11 +7,13 @@
 
 use \Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
-use Drupal\Core\Url;
 use Drupal\aaa_cybersource\Entity\Payment;
 use Drupal\webform\WebformSubmissionInterface;
 use Drupal\webform\Entity\Webform;
 use Drupal\webform\Utility\WebformMailHelper;
+
+// Cron functions.
+include('inc/aaa_cybersource.cron.inc');
 
 /**
  * Implements hook_theme().
@@ -91,23 +93,29 @@ function aaa_cybersource_webform_update($entity) {
  * Implements_webform_submission_form_alter().
  */
 function aaa_cybersource_webform_submission_form_alter(array &$form, FormStateInterface $form_state, $form_id) {
-  $config = \Drupal::service('config.factory')->get('aaa_cybersource.settings');
-  $environment = $config->get('global')['environment'];
   $webform = Webform::load($form['#webform_id']);
-  $uuid = $webform->get('uuid');
+  $handlers = $webform->get('handlers');
 
-  if ($config->get($uuid . '_environment') !== TRUE) {
-    $environment = $config->get($uuid . '_environment');
-  }
+  // Only donation forms.
+  if (isset($handlers['donation_webform_handler'])) {
+    $config = \Drupal::service('config.factory')->get('aaa_cybersource.settings');
+    $environment = $config->get('global')['environment'];
+    $uuid = $webform->get('uuid');
 
-  if ($environment === 'development') {
-    $form['#attached']['library'][] = 'aaa_cybersource/flex-dev';
-  }
-  else {
-    $form['#attached']['library'][] = 'aaa_cybersource/flex';
-  }
+    if ($config->get($uuid . '_environment') !== TRUE) {
+      $environment = $config->get($uuid . '_environment');
+    }
 
-  $form['#attached']['drupalSettings']['aaa_cybersource']['webform'] = $form['#webform_id'];
+    if ($environment === 'development') {
+      $form['#attached']['library'][] = 'aaa_cybersource/flex-dev';
+    }
+    else {
+      $form['#attached']['library'][] = 'aaa_cybersource/flex';
+    }
+
+    $form['#attached']['drupalSettings']['aaa_cybersource']['webform'] = $form['#webform_id'];
+    $form['#attached']['drupalSettings']['aaa_cybersource']['logging'] = (bool) $config->get('global')['logging'] ?? FALSE;
+  }
 }
 
 /**
@@ -234,33 +242,6 @@ function _add_receipt_alias(Webform $entity) {
   $path_alias_current->save();
 }
 
- /**
- * Implements hook_cron().
- */
-function aaa_cybersource_cron() {
-  $recurring = \Drupal::service('aaa_cybersource.recurring_payment');
-
-  $payment_ids = $recurring->query();
-
-  $payments = Payment::loadMultiple($payment_ids);
-
-  $count = 0;
-
-  foreach ($payments as $payment) {
-    $status = $recurring->buildRecurringPayment($payment);
-
-    if ($status === TRUE) {
-      $count++;
-    }
-  }
-
-  if ($count > 0) {
-    \Drupal::service('logger.factory')->get('aaa_cybersource')->info('@count recurring payments created', [
-      '@count' => $count,
-    ]);
-  }
-}
-
 /**
  * Implements hook_webform_element_alter().
  */
@@ -333,3 +314,49 @@ function aaa_cybersource_card_type_number_to_string(string $code) {
   return $codes[$code];
 }
 
+/**
+ * Format amounts which may contain symbols like commas.
+ *
+ * @param integer|float|string $form_amount
+ * @return string $new_amount
+ */
+function aaa_cybersource_format_amount($form_amount) {
+  $new_amount = (string) $form_amount;
+  $form_amount_cents = '00';
+
+  if (is_null($form_amount) || empty($form_amount)) {
+    return 0;
+  }
+
+  $form_amount_array = explode('.', (string) $form_amount);
+
+  // Malformed currency amount: multiple decimals.
+  if (count($form_amount_array) > 2) {
+    return 0;
+  }
+  else if (count($form_amount_array) === 2) {
+    $form_amount_cents = $form_amount_array[1];
+
+    // Malformed cents: not equal to 2.
+    if ($form_amount_cents != '0' && strlen($form_amount_cents) !== 2) {
+      return 0;
+    }
+    else if ($form_amount_cents === '0') {
+      $form_amount_cents = '00';
+    }
+  }
+
+  $form_amount_dollars = $form_amount_array[0];
+
+  if (empty($form_amount_dollars)) {
+    return 0;
+  }
+
+  // strip any commas
+  preg_match_all('/\d+/', $form_amount_dollars, $form_amount_dollars_array);
+  $amount_dollars = implode('', $form_amount_dollars_array[0]);
+
+  $new_amount = $amount_dollars . '.' . $form_amount_cents;
+
+  return (string) $new_amount;
+}

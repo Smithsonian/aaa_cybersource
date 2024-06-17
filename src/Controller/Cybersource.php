@@ -109,17 +109,13 @@ class Cybersource extends ControllerBase implements ContainerInjectionInterface 
    * @return Symfony\Component\HttpFoundation\JsonResponse
    *   The Flex Token.
    */
-  public function getFlexToken(string $webform): JsonResponse {
+  public function getFlexToken($webform): JsonResponse {
     $settings = $this->configFactory->get('aaa_cybersource.settings');
     $request = $this->requestStack->getCurrentRequest();
     $host = 'https://' . $request->headers->get('host');
 
-    if (empty($webform) === FALSE) {
-      $webform_entity = $this->entityRepository->getActive('webform', $webform);
-    }
-
-    if (isset($webform_entity) === TRUE) {
-      $environment = $settings->get($webform_entity->get('uuid') . '_environment');
+    if (isset($webform) === TRUE) {
+      $environment = $settings->get($webform->get('uuid') . '_environment');
     }
 
     if (empty($environment) === TRUE) {

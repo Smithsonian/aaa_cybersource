@@ -124,6 +124,15 @@ class Payment extends ContentEntityBase implements PaymentInterface {
     $fields['code'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Code'))
       ->setDescription(t('Merchant-generated order reference or tracking number. It is recommended that you send a unique value for each transaction so that you can perform meaningful searches for the transaction.'))
+      ->setDisplayOptions('form', [
+        'type' => 'string_textfield',
+        'region' => 'content',
+        'weight' => -1,
+        'settings' => [
+          'size' => 60,
+          'placeholder' => '',
+        ],
+      ])
       ->setDisplayOptions('view', [
         'type' => 'title',
         'label' => 'above',
@@ -134,6 +143,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
         ],
       ])
       ->setDisplayConfigurable('view', TRUE)
+      ->setDisplayConfigurable('form', TRUE)
       ->setRequired(TRUE);
 
     $fields['submitted'] = BaseFieldDefinition::create('datetime')
@@ -161,6 +171,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
           'link_to_entity' => FALSE,
         ],
       ])
+      ->setDisplayConfigurable('form', TRUE)
       ->setDisplayConfigurable('view', TRUE);
 
     $fields['customer_id'] = BaseFieldDefinition::create('string')
@@ -174,6 +185,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
           'link_to_entity' => FALSE,
         ],
       ])
+      ->setDisplayConfigurable('form', TRUE)
       ->setDisplayConfigurable('view', TRUE);
 
     $fields['authorized_amount'] = BaseFieldDefinition::create('float')
@@ -191,6 +203,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
           'prefix_suffix' => TRUE,
         ],
       ])
+      ->setDisplayConfigurable('form', TRUE)
       ->setRequired(TRUE);
 
     $fields['currency'] = BaseFieldDefinition::create('string')
@@ -205,6 +218,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
           'link_to_entity' => FALSE,
         ],
       ])
+      ->setDisplayConfigurable('form', TRUE)
       ->setRequired(TRUE);
 
     $fields['status'] = BaseFieldDefinition::create('string')
@@ -218,6 +232,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
           'link_to_entity' => FALSE,
         ],
       ])
+      ->setDisplayConfigurable('form', TRUE)
       ->setDisplayConfigurable('view', TRUE);
 
     $fields['recurring'] = BaseFieldDefinition::create('boolean')
@@ -232,7 +247,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
         ],
       ])
       ->setDisplayConfigurable('view', TRUE)
-      ->setRequired(TRUE);
+      ->setDisplayConfigurable('form', TRUE);
 
     $fields['environment'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Environment'))
@@ -246,6 +261,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
         ],
       ])
       ->setRequired(TRUE)
+      ->setDisplayConfigurable('form', TRUE)
       ->setDisplayConfigurable('view', TRUE);
 
     $fields['submission'] = BaseFieldDefinition::create('entity_reference')
@@ -261,6 +277,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
           'link' => TRUE,
         ],
       ])
+      ->setDisplayConfigurable('form', TRUE)
       ->setRequired(FALSE);
 
     $fields['recurring_active'] = BaseFieldDefinition::create('boolean')
@@ -348,7 +365,59 @@ class Payment extends ContentEntityBase implements PaymentInterface {
         ],
       ])
       ->setCardinality(-1)
+      ->setDisplayConfigurable('form', TRUE)
       ->setRequired(FALSE);
+
+    $fields['secure_payment_id'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Secure Payment ID'))
+      ->setDescription(t('The ID returned by Cybersource after a payment is secured.'))
+      ->setDisplayOptions('view', [
+        'type' => 'string',
+        'label' => 'above',
+        'weight' => 2,
+        'settings' => [
+          'link_to_entity' => FALSE,
+        ],
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['transaction_id'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Transaction Reference Number'))
+      ->setDescription(t('The reference ID of the credit card settlement. Also refered to as the reconciliation ID.'))
+      ->setDisplayOptions('view', [
+        'type' => 'string',
+        'label' => 'above',
+        'weight' => 2,
+        'settings' => [
+          'link_to_entity' => FALSE,
+        ],
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['order_details'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Order details'))
+      ->setDescription(t('Specific details regarding the order. Important for Gala tickets.'))
+      ->setDisplayOptions('view', [
+        'type' => 'string',
+        'label' => 'above',
+        'weight' => 2,
+        'settings' => [
+          'link_to_entity' => FALSE,
+        ],
+      ])
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['order_details_long'] = BaseFieldDefinition::create('string_long')
+      ->setLabel(t('Order details'))
+      ->setDescription(t('Specific details regarding the order.'))
+      ->setDisplayOptions('view', [
+        'type' => 'string',
+        'label' => 'above',
+        'weight' => 2,
+      ])
+      ->setDisplayConfigurable('view', TRUE);
 
     return $fields;
   }

@@ -1,5 +1,5 @@
 flex:
-  version: 1.0.0
+  version: 1.1.7
   js:
     js/flex.js: {}
   dependencies:
@@ -7,7 +7,7 @@ flex:
     - aaa_cybersource/flex-microform
 
 flex-dev:
-  version: 1.0.0
+  version: 1.1.7
   js:
     js/flex.js: {}
   dependencies:
@@ -25,7 +25,7 @@ flex-microform-dev:
     https://testflex.cybersource.com/microform/bundle/v2/flex-microform.min.js: { minified: true, external: true }
 
 gala-table:
-  version: 1.0.0
+  version: 1.0.9
   js:
     js/gala-table.js: {}
   dependencies:
