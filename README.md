@@ -47,7 +47,7 @@ Create a new form from the Donation Webform Template installed by this module. G
 All the necessary elements are already added to the form but most elements outside the "Payment Details" group can be changed and edited. The only other necessary element is an "amount" element which should return an integer or decimal amount of currency.
 
 ## Payment entity
-Webform submissions will store incoming data from the forms. However it's not a good permanent solution to storing payment data because submissions can be deleted when forms are removed and because form submissions exist as a record of what the form receieved. The Payment entity will exist to record and track the payment and transaction information. They will not be removed if forms are deleted at a future date.
+Webform submissions will store incoming data from the forms. However it's not a good permanent solution to storing payment data because submissions can be deleted when forms are removed and because form submissions exist as a record of what the form receieved. The Payment entity will exist to record and track the payment and transaction information. They will not be removed if forms are deleted at a future date. 
 
 [^1]: Upload file showing error Drupal\Component\Plugin\Exception\PluginNotFoundException The "entity:file:undefined" plugin does not exist https://www.drupal.org/project/drupal/issues/3104812
 [^2]: Create a P12 Certificate for JSON Web Token Authentication https://developer.cybersource.com/docs/cybs/en-us/payouts/developer/all/rest/payouts/authentication/createCert.html
