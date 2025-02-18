@@ -91,14 +91,39 @@ class Receipts {
    * @return string
    *   subject line.
    */
-  public function getSubject() {
-    return 'Thank you for your support of the Archives of American Art';
+  public function getSubject(Payment $payment): string {
+    return $this->getFormSettingForPayment($payment, 'message_subject');
+  }
+
+  /**
+   * Return receipt message, which is used on confirmation page and in email messages.
+   *
+   * @return string
+   *   subject line.
+   */
+  public function getMessage(Payment $payment) {
+    return $this->getFormSettingForPayment($payment, 'message_body');
+  }
+  /**
+   * I find a setting in the current webform that matches for the given payment
+   *
+   * @param Payment $payment
+   * @param string $field
+   * @return string
+   */
+  public function getFormSettingForPayment(Payment $payment,string $field): string {
+    // Drill down until we retrieve the id of the webform; the payment is associated to a given webform submission, and then this links back to the webform
+    $webform = $payment->submission->entity->webform_id->entity;
+    $webform_id = $webform->get('uuid');
+    $settings = $this->configFactory->get('aaa_cybersource.settings');
+    // We have custom settings for each Cybersource webform, and this pulls the value for the specified key
+    return $settings->get($webform_id . '_' . $field);
   }
 
   /**
    * Build receipt element.
    *
-   * @param Drupal\aaa_cybersource\Entity\Payment $payment
+   * @param Payment $payment
    *   Payment entity.
    * @param array $transaction
    *   Transaction array from Cybersource payment processor.
@@ -116,277 +141,273 @@ class Receipts {
 
     // Build receipt.
     $build['title'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'h1',
-      '#value' => t('Receipt'),
+        '#type' => 'html_tag',
+        '#tag' => 'h1',
+        '#value' => t('Receipt'),
     ];
 
     $build['meta'] = [
-      '#type' => 'container',
+        '#type' => 'container',
     ];
 
     $build['meta']['date'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => 'Date: ' . $this->dateFormatter->format(strtotime($datetime), 'long'),
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => 'Date: ' . $this->dateFormatter->format(strtotime($datetime), 'long'),
     ];
 
     $build['meta']['order_number'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t('Order Number: :number', [':number' => $payment->get('code')->value]),
-      '#attributes' => [
-        'style' => ['margin-bottom: 25px'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t('Order Number: :number', [':number' => $payment->get('code')->value]),
+        '#attributes' => [
+            'style' => ['margin-bottom: 25px'],
+        ],
     ];
 
     $build['break_1'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'hr',
+        '#type' => 'html_tag',
+        '#tag' => 'hr',
     ];
 
     $build['billing_information'] = [
-      '#type' => 'container',
-      '#attributes' => [
-        'class' => ['billing-information'],
-      ],
+        '#type' => 'container',
+        '#attributes' => [
+            'class' => ['billing-information'],
+        ],
     ];
 
     $build['billing_information']['title'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'h2',
-      '#value' => t('Billing Information'),
+        '#type' => 'html_tag',
+        '#tag' => 'h2',
+        '#value' => t('Billing Information'),
     ];
 
     $build['billing_information']['address'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'address',
+        '#type' => 'html_tag',
+        '#tag' => 'address',
     ];
 
     $build['billing_information']['address']['name'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t(':firstName :lastName', [
-        ':firstName' => $billTo->getFirstName(),
-        ':lastName' => $billTo->getLastName(),
-      ]),
-      '#attributes' => [
-        'class' => ['name'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t(':firstName :lastName', [
+            ':firstName' => $billTo->getFirstName(),
+            ':lastName' => $billTo->getLastName(),
+        ]),
+        '#attributes' => [
+            'class' => ['name'],
+        ],
     ];
 
     if (!empty($billTo->getCompany())) {
       $build['billing_information']['address']['company'] = [
-        '#type' => 'html_tag',
-        '#tag' => 'div',
-        '#value' => t(':value', [':value' => $billTo->getCompany()]),
-        '#attributes' => [
-          'class' => ['company'],
-        ],
+          '#type' => 'html_tag',
+          '#tag' => 'div',
+          '#value' => t(':value', [':value' => $billTo->getCompany()]),
+          '#attributes' => [
+              'class' => ['company'],
+          ],
       ];
     }
 
     $build['billing_information']['address']['address'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t(':value', [':value' => $billTo->getAddress1()]),
-      '#attributes' => [
-        'class' => ['address'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t(':value', [':value' => $billTo->getAddress1()]),
+        '#attributes' => [
+            'class' => ['address'],
+        ],
     ];
 
     if (!empty($billTo->getAddress2())) {
       $build['billing_information']['address']['address_2'] = [
-        '#type' => 'html_tag',
-        '#tag' => 'div',
-        '#value' => t(':value', [':value' => $billTo->getAddress2()]),
-        '#attributes' => [
-          'class' => ['address-2'],
-        ],
+          '#type' => 'html_tag',
+          '#tag' => 'div',
+          '#value' => t(':value', [':value' => $billTo->getAddress2()]),
+          '#attributes' => [
+              'class' => ['address-2'],
+          ],
       ];
     }
 
     $build['billing_information']['address']['locality'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t(':value', [':value' => $billTo->getLocality()]),
-      '#attributes' => [
-        'class' => ['locality'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t(':value', [':value' => $billTo->getLocality()]),
+        '#attributes' => [
+            'class' => ['locality'],
+        ],
     ];
 
     $build['billing_information']['address']['area'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t(':value', [':value' => $billTo->getAdministrativeArea()]),
-      '#attributes' => [
-        'class' => ['area'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t(':value', [':value' => $billTo->getAdministrativeArea()]),
+        '#attributes' => [
+            'class' => ['area'],
+        ],
     ];
 
     $build['billing_information']['address']['postal_code'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t(':value', [':value' => $billTo->getPostalCode()]),
-      '#attributes' => [
-        'class' => ['postal-code'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t(':value', [':value' => $billTo->getPostalCode()]),
+        '#attributes' => [
+            'class' => ['postal-code'],
+        ],
     ];
 
     $build['billing_information']['address']['email'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t(':value', [':value' => $billTo->getEmail()]),
-      '#attributes' => [
-        'class' => ['email'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t(':value', [':value' => $billTo->getEmail()]),
+        '#attributes' => [
+            'class' => ['email'],
+        ],
     ];
 
     $build['billing_information']['address']['phone'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t(':value', [':value' => $billTo->getPhoneNumber()]),
-      '#attributes' => [
-        'class' => ['phone'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t(':value', [':value' => $billTo->getPhoneNumber()]),
+        '#attributes' => [
+            'class' => ['phone'],
+        ],
     ];
 
     $build['payment_details'] = [
-      '#type' => 'container',
-      '#attributes' => [
-        'class' => ['billing-information'],
-      ],
+        '#type' => 'container',
+        '#attributes' => [
+            'class' => ['billing-information'],
+        ],
     ];
 
     $build['payment_details']['title'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'h2',
-      '#value' => t('Payment Details'),
+        '#type' => 'html_tag',
+        '#tag' => 'h2',
+        '#value' => t('Payment Details'),
     ];
 
     $build['payment_details']['list'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'dl',
+        '#type' => 'html_tag',
+        '#tag' => 'dl',
     ];
 
     $build['payment_details']['list']['card_type_term'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'dd',
-      '#value' => 'Card Type',
+        '#type' => 'html_tag',
+        '#tag' => 'dd',
+        '#value' => 'Card Type',
     ];
 
     $build['payment_details']['list']['card_type_value'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'dd',
-      '#value' => t(':value', [':value' => aaa_cybersource_card_type_number_to_string($card->getType())]),
+        '#type' => 'html_tag',
+        '#tag' => 'dd',
+        '#value' => t(':value', [':value' => aaa_cybersource_card_type_number_to_string($card->getType())]),
     ];
 
     $build['payment_details']['list']['card_number_term'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'dd',
-      '#value' => 'Card Number',
+        '#type' => 'html_tag',
+        '#tag' => 'dd',
+        '#value' => 'Card Number',
     ];
 
     $build['payment_details']['list']['card_number_value'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'dd',
-      '#value' => t('xxxxxxxxxxxx:value', [':value' => $card->getSuffix()]),
+        '#type' => 'html_tag',
+        '#tag' => 'dd',
+        '#value' => t('xxxxxxxxxxxx:value', [':value' => $card->getSuffix()]),
     ];
 
     $build['payment_details']['list']['card_expiration_term'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'dd',
-      '#value' => 'Expiration',
+        '#type' => 'html_tag',
+        '#tag' => 'dd',
+        '#value' => 'Expiration',
     ];
 
     $build['payment_details']['list']['card_expiration_value'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'dd',
-      '#value' => t(':month-:year', [
-        ':month' => $card->getExpirationMonth(),
-        ':year' => $card->getExpirationYear(),
-      ]),
+        '#type' => 'html_tag',
+        '#tag' => 'dd',
+        '#value' => t(':month-:year', [
+            ':month' => $card->getExpirationMonth(),
+            ':year' => $card->getExpirationYear(),
+        ]),
     ];
 
     if ($donationType === 'GALA' || !is_null($payment->get('order_details_long')->value)) {
       $build['order_details'] = [
-        '#type' => 'container',
-        '#attributes' => [
-          'class' => ['order-details'],
-        ],
+          '#type' => 'container',
+          '#attributes' => [
+              'class' => ['order-details'],
+          ],
       ];
 
       $build['order_details']['title'] = [
-        '#type' => 'html_tag',
-        '#tag' => 'h2',
-        '#value' => t('Order Details'),
+          '#type' => 'html_tag',
+          '#tag' => 'h2',
+          '#value' => t('Order Details'),
       ];
 
       $build['order_details']['content'] = [
-        '#type' => 'container',
+          '#type' => 'container',
       ];
 
       $details = explode('; ', $payment->get('order_details_long')->value);
 
       foreach ($details as $i => $detail) {
         $build['order_details']['content'][$i] = [
-          '#type' => 'html_tag',
-          '#tag' => 'div',
-          '#value' => $detail,
+            '#type' => 'html_tag',
+            '#tag' => 'div',
+            '#value' => $detail,
         ];
 
         if ($i === count($details) - 1) {
           $build['order_details']['content'][$i]['#attributes'] = [
-            'style' => ['margin-bottom: 25px'],
+              'style' => ['margin-bottom: 25px'],
           ];
         }
       }
     }
 
     $build['total'] = [
-      '#type' => 'container',
+        '#type' => 'container',
     ];
 
     $build['total']['title'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'h2',
-      '#value' => t('Total Amount'),
+        '#type' => 'html_tag',
+        '#tag' => 'h2',
+        '#value' => t('Total Amount'),
     ];
 
     $amount = number_format($amountDetails->getTotalAmount(), 2);
     $build['total']['amount'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'div',
-      '#value' => t('$:amount', [':amount' => $amount]),
-      '#attributes' => [
-        'style' => ['margin-bottom: 25px'],
-      ],
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t('$:amount', [':amount' => $amount]),
+        '#attributes' => [
+            'style' => ['margin-bottom: 25px'],
+        ],
     ];
 
     $build['break_2'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'hr',
+        '#type' => 'html_tag',
+        '#tag' => 'hr',
     ];
 
     $build['message'] = [
-      '#type' => 'container',
+        '#type' => 'container',
     ];
 
-    if ($donationType === 'GALA') {
-      $markup = "<p>Thank you for your support of the 2024 Archives of American Art Gala. The estimated fair-market value of goods and services for table purchases is $14,755.00 for Gala Host, $4,895.00 for Campaign Champion, $4,535 for Benefactor, $3,785 for Patron, and $3,035 for Partner. Fair-market value for all ticket purchases is $410. If you have any questions about your gift, please contact us at <a href='mailto:AAAGala@si.edu'>AAAGala@si.edu</a> or (202) 633-7989.  We look forward to seeing you in New York City on Tuesday, October 29.</p>";
-    }
-    else {
-      $markup = "<p>Thank you for supporting the Archives of American Art. By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. Unless you opted out of receiving it, donors of at least $250 will receive the Archives of American Art Journal, with goods and services valued at $35. Gifts less than $250 or greater than $1,750 are fully tax deductible. Should you have any questions about your donation, you can reach us at <a>AAAGiving@si.edu</a> or (202) 633-7989.</p>";
-    }
+    // Get the message receipt body for the given webform; this is configured in the settings for the webform on the Cybersource Form Settings page
+    $markup = "<p>" . $this->getMessage($payment) . "</p>";
 
     $build['message']['title'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'h2',
-      '#value' => t('Thank You'),
+        '#type' => 'html_tag',
+        '#tag' => 'h2',
+        '#value' => t('Thank You'),
     ];
 
     $build['message']['message'] = [
-      '#markup' => $markup,
+        '#markup' => $markup,
     ];
 
     return $build;
@@ -404,7 +425,7 @@ class Receipts {
   /**
    * Build an email body. This is the email template.
    *
-   * @param Drupal\aaa_cybersource\Entity\Payment $payment
+   * @param Payment $payment
    *   Payment entity.
    * @param [type]  $billTo
    * @param [type]  $paymentInformation
@@ -420,17 +441,12 @@ class Receipts {
 
     $body = '';
 
-    if ($donationType === 'DONATION') {
-$body .= "
-Thank you for supporting the Archives of American Art. By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. Unless you opted out of receiving it, donors of at least $250 will receive the Archives of American Art Journal, with goods and services valued at $35. Gifts less than $250 or greater than $1,750 are fully tax deductible. Should you have any questions about your donation, you can reach us at AAAGiving@si.edu or (202) 633-7989.
-";
-    } else if ($donationType === 'GALA') {
-$body .= "
-Thank you for your support of the 2024 Archives of American Art Gala. The estimated fair-market value of goods and services for table purchases is $14,755.00 for Gala Host, $4,895.00 for Campaign Champion, $4,535 for Benefactor, $3,785 for Patron, and $3,035 for Partner. Fair-market value for all ticket purchases is $410. If you have any questions about your gift, please contact us at <a href='mailto:AAAGala@si.edu'>AAAGala@si.edu</a> or (202) 633-7989.  We look forward to seeing you in New York City on Tuesday, October 29.
-";
-    }
+    $body .= "
+" . $this->getMessage($payment) . "
 
-$body .= "
+";
+
+    $body .= "
 RECEIPT
 
 Date: {$this->dateFormatter->format(strtotime($datetime), 'long')}
@@ -442,18 +458,18 @@ BILLING INFORMATION
 
 {$billTo->getFirstName()} {$billTo->getLastName()}";
 
-    if (!empty($billTo->getCompany())) {
-$body .= "
+if (!empty($billTo->getCompany())) {
+  $body .= "
 {$billTo->getCompany()}";
-    }
+}
 
 $body .= "
 {$billTo->getAddress1()}";
 
-    if (!empty($billTo->getAddress2())) {
-$body .= "
+if (!empty($billTo->getAddress2())) {
+  $body .= "
 {$billTo->getAddress2()}";
-    }
+}
 
 $body .= "
 {$billTo->getLocality()}
@@ -473,19 +489,19 @@ Expiration {$card->getExpirationMonth()}-{$card->getExpirationYear()}
 ------------------------------------
 ";
 
-    if ($donationType === 'GALA' || !is_null($payment->get('order_details_long')->value)) {
-      $details = explode('; ', $payment->get('order_details_long')->value);
+if ($donationType === 'GALA' || !is_null($payment->get('order_details_long')->value)) {
+  $details = explode('; ', $payment->get('order_details_long')->value);
 
-$body .= "
+  $body .= "
 ORDER DETAILS
 ";
 
-      foreach ($details as $detail) {
-$body .= "
+  foreach ($details as $detail) {
+    $body .= "
 {$detail}
 ";
-      }
-    }
+  }
+}
 
 $body .= "
 TOTAL AMOUNT
@@ -493,7 +509,7 @@ TOTAL AMOUNT
 $ {$amount}
 ";
 
-    return $body;
+return $body;
   }
 
   /**
@@ -512,7 +528,7 @@ $ {$amount}
     $amountDetails = $transaction[0]->getOrderInformation()->getAmountDetails();
     $datetime = $transaction[0]->getSubmitTimeUTC();
     $body = $this->buildReceiptEmailBody($payment, $billTo, $paymentInformation, $amountDetails, $datetime);
-    $subject = $this->getSubject();
+    $subject = $this->getSubject($payment);
 
     if (is_null($to) === TRUE) {
       $to = $billTo->getEmail();
@@ -522,7 +538,7 @@ $ {$amount}
 
     if ($result['send'] === TRUE) {
       $context = [
-        '@code' => $payment->get('code')->value ?? 'unknown code',
+          '@code' => $payment->get('code')->value ?? 'unknown code',
       ];
 
       // Attempt to link to the payment.
@@ -614,9 +630,9 @@ $ {$amount}
    */
   protected function isPaymentInQueue(int $pid) {
     $queued = $this->connection->select('queue', 'q', [])
-      ->condition('q.name', 'receipt_queue', '=')
-      ->fields('q', ['name', 'data', 'item_id'])
-      ->execute();
+    ->condition('q.name', 'receipt_queue', '=')
+    ->fields('q', ['name', 'data', 'item_id'])
+    ->execute();
 
     foreach ($queued as $item) {
       $data = unserialize($item->data);
