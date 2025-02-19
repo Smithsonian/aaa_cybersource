@@ -235,15 +235,12 @@ class SettingsForm extends ConfigFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $config = $this->config('aaa_cybersource.settings');
     $forms = $this->getFormsIds();
-    $environments = $this->getEnvironments();
 
     foreach ($forms as $form_id) {
       $config->set($form_id . '_environment', $form_state->getValue($form_id . '_environment', ''));
 
       if ($this->forms[$form_id]['webform'] === TRUE) {
         $config->set($form_id . '_code', $form_state->getValue($form_id . '_code', 'AAA'));
-        $config->set($form_id . '_message_subject', $form_state->getValue($form_id . '_message_subject'));
-        $config->set($form_id . '_message_body', $form_state->getValue($form_id . '_message_body'));
       }
     }
 
@@ -403,7 +400,6 @@ class SettingsForm extends ConfigFormBase {
    */
   private function buildFormsTabs(array &$form) {
     $forms = $this->getFormsIds();
-    $environments = $this->getEnvironments();
 
     if (count($forms) === 0) {
       $form['forms']['tabs'] = [
@@ -444,29 +440,6 @@ class SettingsForm extends ConfigFormBase {
           ],
         ];
       }
-
-      if ($this->forms[$form_id]['webform'] === TRUE) {
-        $key = $form_id . '_message_subject';
-        $form['forms']['tabs'][$form_id][$key] = [
-            '#title' => $this->t('Receipt Message Subject'),
-            '#type' => 'textfield',
-            '#description' => $this->t('This is the subject that will also be used when sending the confirmation email.'),
-            '#default_value' => $this->config('aaa_cybersource.settings')->get($key) ?? '',
-            '#placeholder' => $this->t('Thank you for supporting the Archives of American Art.'),
-        ];
-      }
-
-      if ($this->forms[$form_id]['webform'] === TRUE) {
-        $key = $form_id . '_message_body';
-        $form['forms']['tabs'][$form_id][$key] = [
-            '#title' => $this->t('Receipt Message Body'),
-            '#type' => 'textarea',
-            '#description' => $this->t('This is the message that will be displayed in the confirmation form, and will also be used when sending the confirmation email.'),
-            '#default_value' => $this->config('aaa_cybersource.settings')->get($key) ?? '',
-            '#placeholder' => $this->t('Thank you for supporting the Archives of American Art. We appreciate your support'),
-        ];
-      }
-
 
       $key = $form_id . '_environment';
       $form['forms']['tabs'][$form_id][$key] = [
