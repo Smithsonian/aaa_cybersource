@@ -92,7 +92,7 @@ class Receipts {
    *   subject line.
    */
   public function getSubject(Payment $payment): string {
-    return $this->getFormSettingForPayment($payment, 'message_subject');
+    return $this->getFormSettingForPayment($payment, 'confirmation_title');
   }
 
   /**
@@ -102,7 +102,7 @@ class Receipts {
    *   subject line.
    */
   public function getMessage(Payment $payment) {
-    return $this->getFormSettingForPayment($payment, 'message_body');
+    return $this->getFormSettingForPayment($payment, 'confirmation_message');
   }
   /**
    * I find a setting in the current webform that matches for the given payment
@@ -114,10 +114,7 @@ class Receipts {
   public function getFormSettingForPayment(Payment $payment,string $field): string {
     // Drill down until we retrieve the id of the webform; the payment is associated to a given webform submission, and then this links back to the webform
     $webform = $payment->submission->entity->webform_id->entity;
-    $webform_id = $webform->get('uuid');
-    $settings = $this->configFactory->get('aaa_cybersource.settings');
-    // We have custom settings for each Cybersource webform, and this pulls the value for the specified key
-    return $settings->get($webform_id . '_' . $field);
+    return $webform->getSetting($field);
   }
 
   /**
