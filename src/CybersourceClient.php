@@ -298,15 +298,9 @@ class CybersourceClient {
       'targetOrigins' => [$targetOrigin],
       'allowedCardNetworks' => [
         "VISA",
-        "MAESTRO",
         "MASTERCARD",
         "AMEX",
         "DISCOVER",
-        "DINERSCLUB",
-        "JCB",
-        "CUP",
-        "CARTESBANCAIRES",
-        "CARNET",
       ],
       "clientVersion" => "v2.0",
     ]);
