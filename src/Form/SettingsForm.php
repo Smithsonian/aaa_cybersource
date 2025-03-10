@@ -289,13 +289,14 @@ class SettingsForm extends ConfigFormBase {
    */
   private function getJwtFile(FormStateInterface &$form_state, array &$global, string $environment) {
     $formFile = $form_state->getValue($environment . '_certificate', 0);
+    $entityTypeManager = \Drupal::entityTypeManager();
     if (is_array($formFile) && isset($formFile[0])) {
-      $file = $this->entityTypeManager->getStorage('file')->load($formFile[0]);
+      $file = $entityTypeManager->getStorage('file')->load($formFile[0]);
       $file->setPermanent();
       $file->save();
     }
     elseif (isset($global[$environment]) && is_null($global[$environment]['certificate']['fid']) === FALSE) {
-      $file = $this->entityTypeManager->getStorage('file')->load($global[$environment]['certificate']['fid']);
+      $file = $entityTypeManager->getStorage('file')->load($global[$environment]['certificate']['fid']);
     }
     else {
       $file = NULL;
