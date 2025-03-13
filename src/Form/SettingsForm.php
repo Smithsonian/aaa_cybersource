@@ -2,6 +2,8 @@
 
 namespace Drupal\aaa_cybersource\Form;
 
+use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
@@ -11,20 +13,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Configure Cybersource settings for this site.
  */
 class SettingsForm extends ConfigFormBase {
-
-  /**
-   * Entity Type Manager for queries.
-   *
-   * @var Drupal\Core\Entity\EntityTypeManager
-   */
-  private $entityTypeManager;
-
-  /**
-   * Entity repository loads entities.
-   *
-   * @var \Drupal\Core\Entity\EntityRepository
-   */
-  private $entityRepository;
 
   /**
    * Contains information about all the forms in a keyed array.
@@ -53,6 +41,7 @@ class SettingsForm extends ConfigFormBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('config.factory'),
+      $container->get('config.typed'),
       $container->get('entity_type.manager'),
       $container->get('entity.repository'),
     );
@@ -61,10 +50,12 @@ class SettingsForm extends ConfigFormBase {
   /**
    * {@inheritDoc}
    */
-  public function __construct($config_factory, $entity_type_manager, $entity_repository) {
-    $this->configFactory = $config_factory;
-    $this->entityTypeManager = $entity_type_manager;
-    $this->entityRepository = $entity_repository;
+  public function __construct(
+    $config_factory,
+    $typed_config_manager,
+    protected EntityTypeManagerInterface $entityTypeManager,
+    protected EntityRepositoryInterface $entityRepository,
+  ) {
     $this->forms = [];
 
     // Include all webforms tagged Cybersource.
@@ -89,6 +80,8 @@ class SettingsForm extends ConfigFormBase {
         ];
       }
     }
+
+    parent::__construct($config_factory, $typed_config_manager);
   }
 
   /**
@@ -289,14 +282,13 @@ class SettingsForm extends ConfigFormBase {
    */
   private function getJwtFile(FormStateInterface &$form_state, array &$global, string $environment) {
     $formFile = $form_state->getValue($environment . '_certificate', 0);
-    $entityTypeManager = \Drupal::entityTypeManager();
     if (is_array($formFile) && isset($formFile[0])) {
-      $file = $entityTypeManager->getStorage('file')->load($formFile[0]);
+      $file = $this->entityTypeManager->getStorage('file')->load($formFile[0]);
       $file->setPermanent();
       $file->save();
     }
     elseif (isset($global[$environment]) && is_null($global[$environment]['certificate']['fid']) === FALSE) {
-      $file = $entityTypeManager->getStorage('file')->load($global[$environment]['certificate']['fid']);
+      $file = $this->entityTypeManager->getStorage('file')->load($global[$environment]['certificate']['fid']);
     }
     else {
       $file = NULL;
