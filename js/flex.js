@@ -1,102 +1,104 @@
-(function(Drupal, drupalSettings, Flex) {
+(function(Drupal, drupalSettings, once, Flex) {
   Drupal.behaviors.aaaWebformTemplates = {
     attach: async function(context, settings) {
-      // Sets up the Microform.
-      Drupal.behaviors.aaaWebformTemplates.formName = context.querySelector('.webform-submission-form').getAttribute('title')
-      const json = await Drupal.behaviors.aaaWebformTemplates.fetchToken()
-      const flex = new Flex(json);
-      const myStyles = {
-        'input': {
-          'font-size': '16px',
-          'font-family': '"GT Walsheim", Helvetica, Arial, sans-serif',
-          'color': '#495057'
-        },
-        ':focus': { 'color': 'black' },
-        ':disabled': { 'cursor': 'not-allowed' },
-        'valid': { 'color': '#495057' },
-        'invalid': { 'color': '#EE2D24' }
-      }
-      const microform = flex.microform({ styles: myStyles })
-      const number = microform.createField('number', { placeholder: 'Enter card number' })
-      // If Credit Card number loads correctly, remove message element.
-      number.on('load', function(err) {
-        button.removeAttribute('disabled')
-        button.classList.toggle('disabled', false)
-        document.querySelector('#not-loaded-warning').remove()
-        Drupal.behaviors.aaaWebformTemplates.log(`Flex microform on ${Drupal.behaviors.aaaWebformTemplates.formName} loaded`)
-      })
-      const securityCode = microform.createField('securityCode', { placeholder: '•••' })
-
-      // Use some logic to prevent form from submitting when Cybersource fails to load.
-      const button = document.querySelector('.webform-submission-form input[type="submit"]')
-      button.setAttribute('disabled', true)
-      button.classList.toggle('disabled', true)
-
-      // Create message element.
-      if (!document.querySelector('#not-loaded-warning')) {
-        const notLoadedElement = document.createElement('div')
-        notLoadedElement.setAttribute('id', 'not-loaded-warning')
-        const notLoadedElementTextChild = document.createTextNode('Payment processor did not load correctly. Unable to submit this form.')
-        const buttonParent = button.parentElement
-        notLoadedElement.appendChild(notLoadedElementTextChild)
-        buttonParent.appendChild(notLoadedElement)
-      }
-
-      // Check for .is-required fields
-      if (context.querySelectorAll('.is-invalid').length > 0) {
-        Drupal.behaviors.aaaWebformTemplates.log(`Submit ${Drupal.behaviors.aaaWebformTemplates.formName} error, reason ${context.querySelectorAll('.is-invalid').length} required fields missing`)
-      }
-      // Identify the containers to replace.
-      number.load('#edit-card-number')
-      securityCode.load('#edit-cvn')
-
-      number.on('change', function(data) {
-        const couldBeValid = data.couldBeValid
-        const empty = data.empty
-
-        if (empty === false && couldBeValid === false) {
-          document.querySelector('#edit-card-number').parentElement.querySelector('#card-number-notification').innerHTML = 'Credit card number is invalid.'
-          document.querySelector('#edit-card-number').classList.toggle('is-invalid', true)
+      once('aaaWebformSetup', '.webform-submission-form', context).forEach(async function(form) {
+        // Sets up the Microform.
+        Drupal.behaviors.aaaWebformTemplates.formName = context.querySelector('.webform-submission-form').getAttribute('title')
+        const json = await Drupal.behaviors.aaaWebformTemplates.fetchToken()
+        const flex = new Flex(json);
+        const myStyles = {
+          'input': {
+            'font-size': '16px',
+            'font-family': '"GT Walsheim", Helvetica, Arial, sans-serif',
+            'color': '#495057'
+          },
+          ':focus': { 'color': 'black' },
+          ':disabled': { 'cursor': 'not-allowed' },
+          'valid': { 'color': '#495057' },
+          'invalid': { 'color': '#EE2D24' }
         }
-        else {
-          document.querySelector('#edit-card-number').parentElement.querySelector('#card-number-notification').innerHTML = ''
-        }
-
-        if (couldBeValid === true) {
-          document.querySelector('#edit-card-number').classList.toggle('is-invalid', false)
-        }
-
-        if (data.card.length === 1) {
-          const type = data.card[0].name === 'amex' ? 'american express' : data.card[0].name
-          const currentTypeInputValue = document.querySelector('input[name="card_type"]:checked')?.value
-          const majorTypes = ['american express', 'discover', 'mastercard', 'visa']
-
-          if (majorTypes.includes(type) === true && type !== currentTypeInputValue) {
-            document.querySelector('input[name="card_type"][value="' + type + '"]').checked = true
-          }
-        }
-      })
-
-      // Update the submit button event listener.
-      button.addEventListener('click', Drupal.behaviors.aaaWebformTemplates.payButton)
-
-      Drupal.behaviors.aaaWebformTemplates.microform = microform
-      Drupal.behaviors.aaaWebformTemplates.number = number
-      Drupal.behaviors.aaaWebformTemplates.securityCode = securityCode
-
-      // Add aria-invalid to all fields which are marked as required.
-      if (context.querySelectorAll('input[required]').length > 0) {
-        context.querySelectorAll('.form-control[required="required"]').forEach(function (i) {
-          i.setAttribute('aria-invalid', false)
+        const microform = flex.microform({ styles: myStyles })
+        const number = microform.createField('number', { placeholder: 'Enter card number' })
+        // If Credit Card number loads correctly, remove message element.
+        number.on('load', function(err) {
+          button.removeAttribute('disabled')
+          button.classList.toggle('disabled', false)
+          document.querySelector('#not-loaded-warning').remove()
+          Drupal.behaviors.aaaWebformTemplates.log(`Flex microform on ${Drupal.behaviors.aaaWebformTemplates.formName} loaded`)
         })
-      }
+        const securityCode = microform.createField('securityCode', { placeholder: '•••' })
 
-      // If after 15s the not-loaded-warning persists, log it.
-      setTimeout(function() {
-        if (document.querySelector('#not-loaded-warning') !== null) {
-          Drupal.behaviors.aaaWebformTemplates.log(`Flex microform on ${Drupal.behaviors.aaaWebformTemplates.formName} did not load after 15s.`)
+        // Use some logic to prevent form from submitting when Cybersource fails to load.
+        const button = document.querySelector('.webform-submission-form input[type="submit"]')
+        button.setAttribute('disabled', true)
+        button.classList.toggle('disabled', true)
+
+        // Create message element.
+        if (!document.querySelector('#not-loaded-warning')) {
+          const notLoadedElement = document.createElement('div')
+          notLoadedElement.setAttribute('id', 'not-loaded-warning')
+          const notLoadedElementTextChild = document.createTextNode('Payment processor did not load correctly. Unable to submit this form.')
+          const buttonParent = button.parentElement
+          notLoadedElement.appendChild(notLoadedElementTextChild)
+          buttonParent.appendChild(notLoadedElement)
         }
-      }, 15000)
+
+        // Check for .is-required fields
+        if (context.querySelectorAll('.is-invalid').length > 0) {
+          Drupal.behaviors.aaaWebformTemplates.log(`Submit ${Drupal.behaviors.aaaWebformTemplates.formName} error, reason ${context.querySelectorAll('.is-invalid').length} required fields missing`)
+        }
+        // Identify the containers to replace.
+        number.load('#edit-card-number')
+        securityCode.load('#edit-cvn')
+
+        number.on('change', function(data) {
+          const couldBeValid = data.couldBeValid
+          const empty = data.empty
+
+          if (empty === false && couldBeValid === false) {
+            document.querySelector('#edit-card-number').parentElement.querySelector('#card-number-notification').innerHTML = 'Credit card number is invalid.'
+            document.querySelector('#edit-card-number').classList.toggle('is-invalid', true)
+          }
+          else {
+            document.querySelector('#edit-card-number').parentElement.querySelector('#card-number-notification').innerHTML = ''
+          }
+
+          if (couldBeValid === true) {
+            document.querySelector('#edit-card-number').classList.toggle('is-invalid', false)
+          }
+
+          if (data.card.length === 1) {
+            const type = data.card[0].name === 'amex' ? 'american express' : data.card[0].name
+            const currentTypeInputValue = document.querySelector('input[name="card_type"]:checked')?.value
+            const majorTypes = ['american express', 'discover', 'mastercard', 'visa']
+
+            if (majorTypes.includes(type) === true && type !== currentTypeInputValue) {
+              document.querySelector('input[name="card_type"][value="' + type + '"]').checked = true
+            }
+          }
+        })
+
+        // Update the submit button event listener.
+        button.addEventListener('click', Drupal.behaviors.aaaWebformTemplates.payButton)
+
+        Drupal.behaviors.aaaWebformTemplates.microform = microform
+        Drupal.behaviors.aaaWebformTemplates.number = number
+        Drupal.behaviors.aaaWebformTemplates.securityCode = securityCode
+
+        // Add aria-invalid to all fields which are marked as required.
+        if (context.querySelectorAll('input[required]').length > 0) {
+          context.querySelectorAll('.form-control[required="required"]').forEach(function (i) {
+            i.setAttribute('aria-invalid', false)
+          })
+        }
+
+        // If after 15s the not-loaded-warning persists, log it.
+        setTimeout(function() {
+          if (document.querySelector('#not-loaded-warning') !== null) {
+            Drupal.behaviors.aaaWebformTemplates.log(`Flex microform on ${Drupal.behaviors.aaaWebformTemplates.formName} did not load after 15s.`)
+          }
+        }, 15000)
+      })
     },
     fetchToken: async function() {
       let webform_id = drupalSettings.aaa_cybersource.webform
@@ -249,4 +251,4 @@
     },
     formName: '',
   }
-})(Drupal, drupalSettings, Flex)
+})(Drupal, drupalSettings, once, Flex)

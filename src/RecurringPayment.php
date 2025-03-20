@@ -105,6 +105,7 @@ class RecurringPayment {
       ->condition('status', 'TRANSMITTED')
       // Stored recurring_next date must be passed.
       ->condition('recurring_next', gmdate($this->dateTimeFormat), '<')
+      ->accessCheck(FALSE)
       ->execute();
   }
 
@@ -124,10 +125,11 @@ class RecurringPayment {
       ->condition('payment_id', NULL, 'IS NOT NULL')
       // Must have customer stored.
       ->condition('customer_id', NULL, 'IS NULL')
+      ->accessCheck(FALSE)
       ->execute();
   }
 
-    /**
+  /**
    * Get list of recurring payments but missing customer.
    *
    * @return array
@@ -141,6 +143,7 @@ class RecurringPayment {
       ->condition('recurring_active', 1)
       // Must have payment id.
       ->condition('payment_id', NULL, 'IS NULL')
+      ->accessCheck(FALSE)
       ->execute();
   }
 
@@ -301,7 +304,7 @@ class RecurringPayment {
       'query' => 'clientReferenceInformation.code:' . $code,
       'sort' => 'submitTimeUtc:desc',
       'offset' => '0',
-      'limit' => '1'
+      'limit' => '1',
     ];
 
     $createSearchRequest = $this->cybersourceClient->createSearchRequest($search);

@@ -364,21 +364,42 @@ class DonationWebformHandler extends WebformHandlerBase {
     if ($isGala === TRUE) {
       $merchantDefinedDataKeyValue = [];
 
-      $i = 1;
-      while (isset($data['gala_0' . $i . '_quantity']) === TRUE) {
-        $twoDigitKey = '0' . $i;
-        $ticketQuantity = $data['gala_' . $twoDigitKey . '_quantity'] > 0 ? $data['gala_' . $twoDigitKey . '_quantity'] : '';
-        $galaTable = $form['elements']['tickets']['gala'];
-        $ticketName = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_ticket_level']['#markup'];
-        $ticketAmount = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_amount']['#markup'];
+      /* THR, 2024-06-18; the old code looped through until it found a missing row, and then it stopped. However, webforms
+       * will frequently have missing rows, since they auto-increment when you delete a row. Instead, just set a known limited
+       * number of rows (the current index is 8, so pad with a few extra) and loop through all of them. This allows for
+       * missing rows. (initialing all code modifications for this change below)
+      */
+      $numberOfRowsToCheck = 15;
 
-        $merchantDefinedDataKeyValue[] = $ticketName . ' , Quantity: ' . $ticketQuantity;
+      // Capture the part of the table focused on the gala tickets (this used to be in each loop in the old code, but we only need it once
+      $galaTable = $form['elements']['tickets']['gala'];
 
-        if ($ticketQuantity > 0) {
-          $paymentOrderDetails[] = $ticketName . ' , Quantity: ' . $ticketQuantity . ', at: ' . $ticketAmount;
-        }
+      // $i is the row index
+      for ($i=1; $i < $numberOfRowsToCheck; $i++) {
+          // The table uses a two digit code (leading zero) for table fields
+          $twoDigitKey = str_pad($i,2,'0',STR_PAD_LEFT);
+          // Check for the existence of the row -- it might be missing, or we might have gotten to the end of the table (THR)
+          if (isset($data['gala_' . $twoDigitKey . '_quantity'])) {
+              $ticketQuantity = $data['gala_' . $twoDigitKey . '_quantity'] > 0 ? $data['gala_' . $twoDigitKey . '_quantity'] : '';
+              $ticketName = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_ticket_level']['#markup'];
+              $ticketAmount = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_amount']['#markup'];
 
-        $i++;
+              $merchantDefinedDataKeyValue[] = $ticketName . ' , Quantity: ' . $ticketQuantity;
+
+              // Add order details for anything the user specified more than 0 of
+              if ($ticketQuantity > 0) {
+                  // The ticket amount is only relevant for order details that have a price per quantity, like a table sponsorship of $2000/table;
+                  if (strlen($ticketAmount)) {
+                      // E.g., "Friend Ticket , Quantity: 1, at: $2000"
+                      $paymentOrderDetails[] = $ticketName . ' , Quantity: ' . $ticketQuantity . ', at: ' . $ticketAmount;
+                  }
+                  // If there's no ticket amount (e.g., for a donation), show the ticket quantity as a total amount
+                  else {
+                      // E.g., "Make a donation: $20" (if the quantity was 20)
+                      $paymentOrderDetails[] = $ticketName . ': $' . $ticketQuantity;
+                  }
+              }
+          }
       }
 
       $merchantDefinedInformation = $this->cybersourceClient->createMerchantDefinedInformation($merchantDefinedDataKeyValue);

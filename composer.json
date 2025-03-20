@@ -10,7 +10,7 @@
     ],
     "minimum-stability": "stable",
     "require": {
-        "cybersource/rest-client-php": "dev-no-apcu"
+        "cybersource/rest-client-php": "dev-autoload-fix"
     },
     "repositories": [
         {

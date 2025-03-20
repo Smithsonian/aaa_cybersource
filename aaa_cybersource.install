@@ -63,13 +63,14 @@ function aaa_cybersource_update_9001() {
  */
 function aaa_cybersource_update_9002() {
   $authorized_payments = \Drupal::entityQuery('payment')
-  ->condition('status', 'AUTHORIZED')
-  ->condition('secure_payment_id', NULL, 'IS NULL')
-  ->condition('transaction_id', NULL, 'IS NULL')
-  ->condition('recurring_active', FALSE)
-  ->sort('changed', 'DESC')
-  ->range(0, 10)
-  ->execute();
+    ->condition('status', 'AUTHORIZED')
+    ->condition('secure_payment_id', NULL, 'IS NULL')
+    ->condition('transaction_id', NULL, 'IS NULL')
+    ->condition('recurring_active', FALSE)
+    ->sort('changed', 'DESC')
+    ->range(0, 10)
+    ->accessCheck(FALSE)
+    ->execute();
 
   $payments = Payment::loadMultiple($authorized_payments);
   $cybersourceClient = \Drupal::service('aaa_cybersource.cybersource_client');
@@ -121,7 +122,7 @@ function aaa_cybersource_update_9004() {
  * Order details needs a different field type.
  */
 function aaa_cybersource_update_9006() {
-  // Install new field.    
+  // Install new field.
   $orderDetails = BaseFieldDefinition::create('string_long')
     ->setLabel(t('Order details'))
     ->setDescription(t('Specific details regarding the order.'))
@@ -137,9 +138,10 @@ function aaa_cybersource_update_9006() {
 
   // Collect existing data and add it to new field.
   $payments_with_data = \Drupal::entityQuery('payment')
-  ->condition('order_details', NULL, 'IS NOT NULL')
-  ->sort('changed', 'DESC')
-  ->execute();
+    ->condition('order_details', NULL, 'IS NOT NULL')
+    ->sort('changed', 'DESC')
+    ->accessCheck(FALSE)
+    ->execute();
 
   $payments = Payment::loadMultiple($payments_with_data);
 
@@ -149,4 +151,20 @@ function aaa_cybersource_update_9006() {
     $payment->save();
   }
 
+}
+
+/**
+ * Update all Cybersource webform entity routes.
+ */
+function aaa_cybersource_update_10000() {
+  $webformIds = \Drupal::entityTypeManager()->getStorage('webform')
+    ->getQuery()
+    ->condition('template', TRUE, '<>')
+    ->accessCheck(FALSE)
+    ->execute();
+
+  $webformEntities = \Drupal::entityTypeManager()->getStorage('webform')->loadMultiple($webformIds);
+  foreach ($webformEntities as $webformEntity) {
+    aaa_cybersource_webform_update($webformEntity);
+  }
 }

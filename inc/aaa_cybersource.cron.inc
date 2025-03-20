@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Module cron and related functions.
@@ -6,20 +7,21 @@
 
 use Drupal\aaa_cybersource\Entity\Payment;
 
- /**
+/**
  * Implements hook_cron().
  */
 function aaa_cybersource_cron() {
   // Check for authorized pending review.
   $pending_review = \Drupal::entityQuery('payment')
     ->condition('status', 'AUTHORIZED_PENDING_REVIEW')
+    ->accessCheck(FALSE)
     ->execute();
 
-  $pening_review_payments = Payment::loadMultiple($pending_review);
+  $pending_review_payments = Payment::loadMultiple($pending_review);
 
   $cybersourceClient = \Drupal::service('aaa_cybersource.cybersource_client');
 
-  foreach ($pening_review_payments as $payment) {
+  foreach ($pending_review_payments as $payment) {
     $paymentId = $payment->get('payment_id')->value;
     $environment = $payment->get('environment')->value;
 
@@ -27,7 +29,7 @@ function aaa_cybersource_cron() {
 
     $transaction = $cybersourceClient->getTransaction($paymentId);
 
-    if (isset($transaction[0])) {
+    if (get_class($transaction) !== 'CyberSource\ApiException' && isset($transaction[0])) {
       $links = $transaction[0]->getLinks()->getRelatedTransactions();
 
       if (!is_null($links)) {
@@ -62,6 +64,7 @@ function aaa_cybersource_cron() {
   // Check for transmitted payments.
   $pending_transmission = \Drupal::entityQuery('payment')
     ->condition('status', ['AUTHORIZED', 'PENDING'], 'IN')
+    ->accessCheck(FALSE)
     ->execute();
 
   $pending_transmission_payments = Payment::loadMultiple($pending_transmission);
@@ -88,7 +91,7 @@ function aaa_cybersource_cron() {
 
       continue;
     }
-    else if (!is_array($transaction)) {
+    elseif (!is_array($transaction)) {
       continue;
     }
 

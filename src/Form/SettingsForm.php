@@ -2,30 +2,17 @@
 
 namespace Drupal\aaa_cybersource\Form;
 
+use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
-use Drupal\file\Entity\File;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Configure Cybersource settings for this site.
  */
 class SettingsForm extends ConfigFormBase {
-
-  /**
-   * Entity Type Manager for queries.
-   *
-   * @var Drupal\Core\Entity\EntityTypeManager
-   */
-  private $entityTypeManager;
-
-  /**
-   * Entity repository loads entities.
-   *
-   * @var \Drupal\Core\Entity\EntityRepository
-   */
-  private $entityRepository;
 
   /**
    * Contains information about all the forms in a keyed array.
@@ -54,6 +41,7 @@ class SettingsForm extends ConfigFormBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('config.factory'),
+      $container->get('config.typed'),
       $container->get('entity_type.manager'),
       $container->get('entity.repository'),
     );
@@ -62,27 +50,38 @@ class SettingsForm extends ConfigFormBase {
   /**
    * {@inheritDoc}
    */
-  public function __construct($config_factory, $entity_type_manager, $entity_repository) {
-    $this->configFactory = $config_factory;
-    $this->entityTypeManager = $entity_type_manager;
-    $this->entityRepository = $entity_repository;
+  public function __construct(
+    $config_factory,
+    $typed_config_manager,
+    protected EntityTypeManagerInterface $entityTypeManager,
+    protected EntityRepositoryInterface $entityRepository,
+  ) {
     $this->forms = [];
 
     // Include all webforms tagged Cybersource.
-    $webform_ids = $this->entityTypeManager->getStorage('webform')->getQuery('AND')->condition('template', TRUE, '<>')->condition('category', 'Cybersource')->execute();
+    $webform_ids = $this->entityTypeManager->getStorage('webform')
+      ->getQuery()
+      ->condition('template', TRUE, '<>')
+      ->accessCheck(FALSE)
+      ->execute();
+
     foreach ($webform_ids as $webform_id) {
       $webform = $this->entityRepository->getActive('webform', $webform_id);
-      $this->forms[$webform->get('uuid')] = [
-        'description' => $this->t(':description', [':description' => $webform->get('description')]),
-        'link' => [
-          '#title' => $this->t('Edit Form'),
-          '#type' => 'link',
-          '#url' => Url::fromRoute('entity.webform.edit_form', ['webform' => $webform_id]),
-        ],
-        'title' => $this->t(':title', [':title' => $webform->label()]),
-        'webform' => TRUE,
-      ];
+      if (in_array('Cybersource', $webform->get('categories')) && $webform->getHandler('donation_webform_handler')) {
+        $this->forms[$webform->get('uuid')] = [
+          'description' => $this->t(':description', [':description' => $webform->get('description')]),
+          'link' => [
+            '#title' => $this->t('Edit Form'),
+            '#type' => 'link',
+            '#url' => Url::fromRoute('entity.webform.edit_form', ['webform' => $webform_id]),
+          ],
+          'title' => $this->t(':title', [':title' => $webform->label()]),
+          'webform' => TRUE,
+        ];
+      }
     }
+
+    parent::__construct($config_factory, $typed_config_manager);
   }
 
   /**
@@ -229,7 +228,6 @@ class SettingsForm extends ConfigFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $config = $this->config('aaa_cybersource.settings');
     $forms = $this->getFormsIds();
-    $environments = $this->getEnvironments();
 
     foreach ($forms as $form_id) {
       $config->set($form_id . '_environment', $form_state->getValue($form_id . '_environment', ''));
@@ -285,12 +283,12 @@ class SettingsForm extends ConfigFormBase {
   private function getJwtFile(FormStateInterface &$form_state, array &$global, string $environment) {
     $formFile = $form_state->getValue($environment . '_certificate', 0);
     if (is_array($formFile) && isset($formFile[0])) {
-      $file = File::load($formFile[0]);
+      $file = $this->entityTypeManager->getStorage('file')->load($formFile[0]);
       $file->setPermanent();
       $file->save();
     }
     elseif (isset($global[$environment]) && is_null($global[$environment]['certificate']['fid']) === FALSE) {
-      $file = File::load($global[$environment]['certificate']['fid']);
+      $file = $this->entityTypeManager->getStorage('file')->load($global[$environment]['certificate']['fid']);
     }
     else {
       $file = NULL;
@@ -395,7 +393,6 @@ class SettingsForm extends ConfigFormBase {
    */
   private function buildFormsTabs(array &$form) {
     $forms = $this->getFormsIds();
-    $environments = $this->getEnvironments();
 
     if (count($forms) === 0) {
       $form['forms']['tabs'] = [

@@ -2,7 +2,7 @@ name: 'Cybersource'
 type: module
 description: Base module for SI:AAA Drupal integration with Cybersource payment processor. Manage Cybersource credentials and site settings.
 package: AAA
-core_version_requirement: ^9 || ^10
+core_version_requirement: ^9 || ^10 || ^11
 dependencies:
   - webform
   - webform_templates

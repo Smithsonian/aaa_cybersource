@@ -5,15 +5,15 @@
  * Primary module hooks for aaa_cybersource module.
  */
 
-use \Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
 use Drupal\aaa_cybersource\Entity\Payment;
-use Drupal\webform\WebformSubmissionInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Render\Element;
 use Drupal\webform\Entity\Webform;
 use Drupal\webform\Utility\WebformMailHelper;
+use Drupal\webform\WebformSubmissionInterface;
 
 // Cron functions.
-include('inc/aaa_cybersource.cron.inc');
+include 'inc/aaa_cybersource.cron.inc';
 
 /**
  * Implements hook_theme().
@@ -62,7 +62,7 @@ function aaa_cybersource_webform_submission_insert(WebformSubmissionInterface $e
  * Implements hook_theme_suggestions_HOOK().
  */
 function aaa_cybersource_theme_suggestions_webform_confirmation(array $variables) {
-  if ($variables['webform']->get('category') === 'Cybersource') {
+  if (in_array('Cybersource', $variables['webform']->get('categories'))) {
     return ['webform_confirmation__cybersource__receipt'];
   }
 }
@@ -73,8 +73,8 @@ function aaa_cybersource_theme_suggestions_webform_confirmation(array $variables
  * Copy the Webform alias updater and add a '/receipt' route.
  */
 function aaa_cybersource_webform_insert($entity) {
-  if ($entity->get('category') === 'Cybersource') {
-    _add_receipt_alias($entity);
+  if (in_array('Cybersource', $entity->get('categories'))) {
+    aaa_cybersource_add_receipt_alias($entity);
   }
 }
 
@@ -84,8 +84,8 @@ function aaa_cybersource_webform_insert($entity) {
  * Copy the Webform alias updater and add a '/receipt' route.
  */
 function aaa_cybersource_webform_update($entity) {
-  if ($entity->get('category') === 'Cybersource') {
-    _add_receipt_alias($entity);
+  if (in_array('Cybersource', $entity->get('categories'))) {
+    aaa_cybersource_add_receipt_alias($entity);
   }
 }
 
@@ -121,7 +121,8 @@ function aaa_cybersource_webform_submission_form_alter(array &$form, FormStateIn
 /**
  * Implements hook_mail().
  *
- * Copied from the Webform module, including using some of the utility functions.
+ * Copied from the Webform module,
+ * including using some of the utility functions.
  */
 function aaa_cybersource_mail($key, &$message, $params) {
   // Never send emails when using devel generate to create
@@ -204,9 +205,10 @@ function aaa_cybersource_mail($key, &$message, $params) {
 /**
  * Adds an alias URL for the receipt page of cybersource forms.
  *
- * @param Webform $entity
+ * @param \Drupal\webform\Entity\Webform $entity
+ *   The webform entity.
  */
-function _add_receipt_alias(Webform $entity) {
+function aaa_cybersource_add_receipt_alias(Webform $entity) {
   $page_submit_path = $entity->getSetting('page_submit_path');
   $default_page_base_path = \Drupal::config('webform.settings')->get('settings.default_page_base_path');
 
@@ -245,7 +247,7 @@ function _add_receipt_alias(Webform $entity) {
 /**
  * Implements hook_webform_element_alter().
  */
-function aaa_cybersource_webform_element_alter(array &$element, \Drupal\Core\Form\FormStateInterface $form_state, array $context) {
+function aaa_cybersource_webform_element_alter(array &$element, FormStateInterface $form_state, array $context) {
   if ($element['#type'] === 'webform_table' && $element['#webform_key'] === 'gala') {
     // Attach helpful JS library.
     $element['#attached']['library'][] = 'aaa_cybersource/gala-table';
@@ -283,7 +285,10 @@ function aaa_cybersource_get_next_recurring_payment_date(int $timestamp) {
  * Takes CyberSource code and returns the human-string card type.
  *
  * @param string $code
+ *   The CyberSource card type code.
+ *
  * @return string
+ *   The human-readable card type.
  */
 function aaa_cybersource_card_type_number_to_string(string $code) {
   $codes = [
@@ -317,8 +322,11 @@ function aaa_cybersource_card_type_number_to_string(string $code) {
 /**
  * Format amounts which may contain symbols like commas.
  *
- * @param integer|float|string $form_amount
- * @return string $new_amount
+ * @param int|float|string $form_amount
+ *   The amount to format.
+ *
+ * @return string
+ *   The formatted amount.
  */
 function aaa_cybersource_format_amount($form_amount) {
   $new_amount = (string) $form_amount;
@@ -334,14 +342,14 @@ function aaa_cybersource_format_amount($form_amount) {
   if (count($form_amount_array) > 2) {
     return 0;
   }
-  else if (count($form_amount_array) === 2) {
+  elseif (count($form_amount_array) === 2) {
     $form_amount_cents = $form_amount_array[1];
 
     // Malformed cents: not equal to 2.
     if ($form_amount_cents != '0' && strlen($form_amount_cents) !== 2) {
       return 0;
     }
-    else if ($form_amount_cents === '0') {
+    elseif ($form_amount_cents === '0') {
       $form_amount_cents = '00';
     }
   }
@@ -352,7 +360,7 @@ function aaa_cybersource_format_amount($form_amount) {
     return 0;
   }
 
-  // strip any commas
+  // Strip any commas.
   preg_match_all('/\d+/', $form_amount_dollars, $form_amount_dollars_array);
   $amount_dollars = implode('', $form_amount_dollars_array[0]);
 

@@ -95,6 +95,7 @@ class PaymentListBuilder extends EntityListBuilder {
     $total = $this->getStorage()
       ->getQuery()
       ->count()
+      ->accessCheck(FALSE)
       ->execute();
 
     $build['summary']['#markup'] = $this->t('Total payments: @total', ['@total' => $total]);
