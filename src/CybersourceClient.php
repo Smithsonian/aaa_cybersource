@@ -87,6 +87,11 @@ class CybersourceClient {
   protected $entityRepository;
 
 
+  /**
+   * Authentication.
+   *
+   * @var mixed
+   */
   protected $auth;
 
   /**
@@ -166,12 +171,20 @@ class CybersourceClient {
     $this->apiClient = $apiClient;
   }
 
+  /**
+   * Set certificate key password.
+   */
+  public function setCertificateKeyPassword(string $certificateKeyPassword): void {
+    $this->certificateKeyPassword = $certificateKeyPassword;
+  }
+
   protected $requestHost;
   protected $merchantId;
   protected $merchantKey;
   protected $merchantSecretKey;
   protected $certificateDirectory;
   protected $certificateFile;
+  protected $certificateKeyPassword = '';
   protected $payload;
   protected $merchantConfiguration;
   protected $settings;
@@ -236,6 +249,7 @@ class CybersourceClient {
 
           $this->setCertificateDirectory($realpath . DIRECTORY_SEPARATOR);
           $this->setCertificateFile(explode('.', $this->fileSystem->basename($uri))[0]);
+          $this->setCertificateKeyPassword($global[$global['environment']]['certificate']['key_pass'] ?? '');
 
           $ready = TRUE;
         }
@@ -677,6 +691,7 @@ class CybersourceClient {
     $realpath = $this->fileSystem->realpath($dir);
     $this->setCertificateDirectory($realpath . DIRECTORY_SEPARATOR);
     $this->setCertificateFile(explode('.', $this->fileSystem->basename($uri))[0]);
+    $this->setCertificateKeyPassword($environmentalSettings['certificate']['key_pass'] ?? '');
 
     $this->apiClient->getConfig()->setHost($this->requestHost);
 
@@ -883,7 +898,7 @@ class CybersourceClient {
     $merchantConfiguration->setKeyAlias($this->merchantId);
     $merchantConfiguration->setKeyFileName($this->certificateFile);
     $merchantConfiguration->setKeysDirectory($this->certificateDirectory);
-    $merchantConfiguration->setKeyPassword('');
+    $merchantConfiguration->setKeyPassword($this->certificateKeyPassword);
     $merchantConfiguration->setUseMetaKey(FALSE);
     $merchantConfiguration->setRunEnvironment($this->requestHost);
     $merchantConfiguration->setIntermediateHost($this->requestHost);

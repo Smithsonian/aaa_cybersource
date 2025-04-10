@@ -249,6 +249,7 @@ class SettingsForm extends ConfigFormBase {
         'merchant_secret' => $form_state->getValue('development_merchant_secret', $global['development']['merchant_secret'] ?? ''),
         'certificate' => [
           'fid' => isset($devFile) ? $devFile->id() : NULL,
+          'key_pass' => $form_state->getValue('development_key_pass', $global['development']['key_pass'] ?? ''),
         ],
       ],
       'environment' => $form_state->getValue('environment', $global['environment'] ?? ''),
@@ -258,6 +259,7 @@ class SettingsForm extends ConfigFormBase {
         'merchant_secret' => $form_state->getValue('production_merchant_secret', $global['production']['merchant_secret'] ?? ''),
         'certificate' => [
           'fid' => isset($prodFile) ? $prodFile->id() : NULL,
+          'key_pass' => $form_state->getValue('production_key_pass', $global['production']['key_pass'] ?? ''),
         ],
       ],
       'receipt_availibility' => $form_state->getValue('receipt_availibility', $global['receipt_availibility'] ?? 7),
@@ -382,6 +384,13 @@ class SettingsForm extends ConfigFormBase {
       '#default_value' => $fileExists === TRUE ? [$config->get('global')[$environment]['certificate']['fid']] : [],
       '#description' => $fileExists ? $this->t('OK. Certificate previously uploaded.') : $this->t('Warning. No certificate stored'),
       '#title' => $this->t('JWT Certificate'),
+    ];
+
+    $form['global'][$environment][$environment . '_key_pass'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Certificate password'),
+      '#description' => $this->t('Password for the private key. This can be left empty if the keyphrase is identical to the Merchant ID.'),
+      '#default_value' => $config->get('global')[$environment]['certificate']['key_pass'] ?? '',
     ];
   }
 
