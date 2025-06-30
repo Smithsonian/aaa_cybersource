@@ -382,7 +382,13 @@ class DonationWebformHandler extends WebformHandlerBase {
           if (isset($data['gala_' . $twoDigitKey . '_quantity'])) {
               $ticketQuantity = $data['gala_' . $twoDigitKey . '_quantity'] > 0 ? $data['gala_' . $twoDigitKey . '_quantity'] : '';
               $ticketName = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_ticket_level']['#markup'];
-              $ticketAmount = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_amount']['#markup'];
+              if (!empty($galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_amount']['#markup'])) {
+                $ticketAmount = $galaTable['gala_' . $twoDigitKey]['gala_' . $twoDigitKey . '_amount']['#markup'];
+              }
+              // If the markup for the amount is blank (like for donations), then just make it blank
+              else {
+                $ticketAmount = '';
+              }
 
               $merchantDefinedDataKeyValue[] = $ticketName . ' , Quantity: ' . $ticketQuantity;
 
