@@ -2,6 +2,8 @@
 
 namespace Drupal\aaa_cybersource\Form;
 
+use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
@@ -11,20 +13,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Configure Cybersource settings for this site.
  */
 class SettingsForm extends ConfigFormBase {
-
-  /**
-   * Entity Type Manager for queries.
-   *
-   * @var Drupal\Core\Entity\EntityTypeManager
-   */
-  private $entityTypeManager;
-
-  /**
-   * Entity repository loads entities.
-   *
-   * @var \Drupal\Core\Entity\EntityRepository
-   */
-  private $entityRepository;
 
   /**
    * Contains information about all the forms in a keyed array.
@@ -53,6 +41,7 @@ class SettingsForm extends ConfigFormBase {
   public static function create(ContainerInterface $container) {
     return new static(
         $container->get('config.factory'),
+      $container->get('config.typed'),
         $container->get('entity_type.manager'),
         $container->get('entity.repository'),
         );
@@ -61,10 +50,12 @@ class SettingsForm extends ConfigFormBase {
   /**
    * {@inheritDoc}
    */
-  public function __construct($config_factory, $entity_type_manager, $entity_repository) {
-    $this->configFactory = $config_factory;
-    $this->entityTypeManager = $entity_type_manager;
-    $this->entityRepository = $entity_repository;
+  public function __construct(
+    $config_factory,
+    $typed_config_manager,
+    protected EntityTypeManagerInterface $entityTypeManager,
+    protected EntityRepositoryInterface $entityRepository,
+  ) {
     $this->forms = [];
 
     // Include all webforms tagged Cybersource.
@@ -89,6 +80,8 @@ class SettingsForm extends ConfigFormBase {
         ];
       }
     }
+
+    parent::__construct($config_factory, $typed_config_manager);
   }
 
   /**
@@ -256,6 +249,7 @@ class SettingsForm extends ConfigFormBase {
             'merchant_secret' => $form_state->getValue('development_merchant_secret', $global['development']['merchant_secret'] ?? ''),
             'certificate' => [
                 'fid' => isset($devFile) ? $devFile->id() : NULL,
+          'key_pass' => $form_state->getValue('development_key_pass', $global['development']['key_pass'] ?? ''),
             ],
         ],
         'environment' => $form_state->getValue('environment', $global['environment'] ?? ''),
@@ -265,6 +259,7 @@ class SettingsForm extends ConfigFormBase {
             'merchant_secret' => $form_state->getValue('production_merchant_secret', $global['production']['merchant_secret'] ?? ''),
             'certificate' => [
                 'fid' => isset($prodFile) ? $prodFile->id() : NULL,
+          'key_pass' => $form_state->getValue('production_key_pass', $global['production']['key_pass'] ?? ''),
             ],
         ],
         'receipt_availibility' => $form_state->getValue('receipt_availibility', $global['receipt_availibility'] ?? 7),
@@ -389,6 +384,13 @@ class SettingsForm extends ConfigFormBase {
         '#default_value' => $fileExists === TRUE ? [$config->get('global')[$environment]['certificate']['fid']] : [],
         '#description' => $fileExists ? $this->t('OK. Certificate previously uploaded.') : $this->t('Warning. No certificate stored'),
         '#title' => $this->t('JWT Certificate'),
+    ];
+
+    $form['global'][$environment][$environment . '_key_pass'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Certificate password'),
+      '#description' => $this->t('Password for the private key. This can be left empty if the keyphrase is identical to the Merchant ID.'),
+      '#default_value' => $config->get('global')[$environment]['certificate']['key_pass'] ?? '',
     ];
   }
 
