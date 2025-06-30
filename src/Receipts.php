@@ -91,8 +91,30 @@ class Receipts {
    * @return string
    *   subject line.
    */
-  public function getSubject() {
-    return 'Thank you for your support of the Archives of American Art';
+  public function getSubject(Payment $payment): string {
+    return $this->getFormSettingForPayment($payment, 'confirmation_title');
+  }
+
+  /**
+   * Return receipt message, which is used on confirmation page and in email messages.
+   *
+   * @return string
+   *   subject line.
+   */
+  public function getMessage(Payment $payment) {
+    return $this->getFormSettingForPayment($payment, 'confirmation_message');
+  }
+  /**
+   * I find a setting in the current webform that matches for the given payment
+   *
+   * @param Payment $payment
+   * @param string $field
+   * @return string
+   */
+  public function getFormSettingForPayment(Payment $payment,string $field): string {
+    // Drill down until we retrieve the id of the webform; the payment is associated to a given webform submission, and then this links back to the webform
+    $webform = $payment->submission->entity->webform_id->entity;
+    return $webform->getSetting($field);
   }
 
   /**
@@ -372,12 +394,8 @@ class Receipts {
       '#type' => 'container',
     ];
 
-    if ($donationType === 'GALA') {
-      $markup = "<p>Thank you for your support of the 2024 Archives of American Art Gala. The estimated fair-market value of goods and services for table purchases is $14,755.00 for Gala Host, $4,895.00 for Campaign Champion, $4,535 for Benefactor, $3,785 for Patron, and $3,035 for Partner. Fair-market value for all ticket purchases is $410. If you have any questions about your gift, please contact us at <a href='mailto:AAAGala@si.edu'>AAAGala@si.edu</a> or (202) 633-7989.  We look forward to seeing you in New York City on Tuesday, October 29.</p>";
-    }
-    else {
-      $markup = "<p>Thank you for supporting the Archives of American Art. By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. Unless you opted out of receiving it, donors of at least $250 will receive the Archives of American Art Journal, with goods and services valued at $35. Gifts less than $250 or greater than $1,750 are fully tax deductible. Should you have any questions about your donation, you can reach us at <a>AAAGiving@si.edu</a> or (202) 633-7989.</p>";
-    }
+    // Get the message receipt body for the given webform; this is configured in the settings for the webform on the Cybersource Form Settings page
+    $markup = "<p>" . $this->getMessage($payment) . "</p>";
 
     $build['message']['title'] = [
       '#type' => 'html_tag',
@@ -420,15 +438,10 @@ class Receipts {
 
     $body = '';
 
-    if ($donationType === 'DONATION') {
 $body .= "
-Thank you for supporting the Archives of American Art. By giving to the Archives, you are helping to ensure that significant records and untold stories documenting the history of art in America are collected, preserved, and shared with the world. Unless you opted out of receiving it, donors of at least $250 will receive the Archives of American Art Journal, with goods and services valued at $35. Gifts less than $250 or greater than $1,750 are fully tax deductible. Should you have any questions about your donation, you can reach us at AAAGiving@si.edu or (202) 633-7989.
+" . $this->getMessage($payment) . "
+
 ";
-    } else if ($donationType === 'GALA') {
-$body .= "
-Thank you for your support of the 2024 Archives of American Art Gala. The estimated fair-market value of goods and services for table purchases is $14,755.00 for Gala Host, $4,895.00 for Campaign Champion, $4,535 for Benefactor, $3,785 for Patron, and $3,035 for Partner. Fair-market value for all ticket purchases is $410. If you have any questions about your gift, please contact us at <a href='mailto:AAAGala@si.edu'>AAAGala@si.edu</a> or (202) 633-7989.  We look forward to seeing you in New York City on Tuesday, October 29.
-";
-    }
 
 $body .= "
 RECEIPT
@@ -512,7 +525,7 @@ $ {$amount}
     $amountDetails = $transaction[0]->getOrderInformation()->getAmountDetails();
     $datetime = $transaction[0]->getSubmitTimeUTC();
     $body = $this->buildReceiptEmailBody($payment, $billTo, $paymentInformation, $amountDetails, $datetime);
-    $subject = $this->getSubject();
+    $subject = $this->getSubject($payment);
 
     if (is_null($to) === TRUE) {
       $to = $billTo->getEmail();
