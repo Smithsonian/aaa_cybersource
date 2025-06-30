@@ -443,6 +443,11 @@ $body .= "
 
 ";
 
+// Remove link for saving copy of receipt
+$body = preg_replace('/You may save a copy of a receipt for your records [^.]+\./','',$body);
+// Remove notice about receiving email receipt
+$body = preg_replace('/You will receive an email copy of your receipt\./','',$body);
+
 $body .= "
 RECEIPT
 
