@@ -3,6 +3,7 @@ global:
   development:
     certificate:
       fid: ''
+      key_pass: ''
     merchant_id: ''
     merchant_key: ''
     merchant_secret: ''
@@ -10,6 +11,7 @@ global:
   production:
     certificate:
       fid: ''
+      key_pass: ''
     merchant_id: ''
     merchant_key: ''
     merchant_secret: ''
