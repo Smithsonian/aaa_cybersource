@@ -29,7 +29,10 @@ function aaa_cybersource_cron() {
 
     $transaction = $cybersourceClient->getTransaction($paymentId);
 
-    if (get_class($transaction) !== 'CyberSource\ApiException' && isset($transaction[0])) {
+    if (is_null($transaction)) {
+    	\Drupal::logger('aaa_cybersource')->warning('There appears to be no matching transaction for payment id ' . $paymentId);
+    }
+    else if (get_class($transaction) !== 'CyberSource\ApiException' && isset($transaction[0])) {
       $links = $transaction[0]->getLinks()->getRelatedTransactions();
 
       if (!is_null($links)) {
