@@ -19,6 +19,7 @@ function aaa_cybersource_cron() {
 
   $pending_review_payments = Payment::loadMultiple($pending_review);
 
+  /** @var \Drupal\aaa_cybersource\CybersourceClient $cybersourceClient */
   $cybersourceClient = \Drupal::service('aaa_cybersource.cybersource_client');
 
   foreach ($pending_review_payments as $payment) {
@@ -30,12 +31,12 @@ function aaa_cybersource_cron() {
     $transaction = $cybersourceClient->getTransaction($paymentId);
 
     if (is_null($transaction)) {
-    	\Drupal::logger('aaa_cybersource')->warning('There appears to be no matching transaction for payment id ' . $paymentId);
+      \Drupal::logger('aaa_cybersource')->warning('There appears to be no matching transaction for payment id ' . $paymentId);
     }
-    else if (!is_object($transaction)) {
-    	\Drupal::logger('aaa_cybersource')->warning('Trying to match for payment ' . $paymentId . ' led to a non-object result:' . gettype($transaction));
+    elseif (!is_array($transaction)) {
+      \Drupal::logger('aaa_cybersource')->error('Trying to match for payment ' . $paymentId . ' led to error:' . $transaction->getResponseBody());
     }
-    else if (get_class($transaction) !== 'CyberSource\ApiException' && isset($transaction[0])) {
+    elseif (isset($transaction[0])) {
       $links = $transaction[0]->getLinks()->getRelatedTransactions();
 
       if (!is_null($links)) {
