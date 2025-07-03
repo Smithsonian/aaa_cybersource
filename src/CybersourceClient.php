@@ -618,7 +618,9 @@ class CybersourceClient {
    * @param string $id
    *   The transaction id.
    *
-   * @return TssV2TransactionsGet200Response
+   * @return array|ApiException
+   *   of \CyberSource\Model\TssV2TransactionsGet200Response, HTTP status code,
+   *   HTTP response headers (array of strings) or ApiException.
    */
   public function getTransaction($id) {
     $transactionDetails = new TransactionDetailsApi($this->apiClient);
