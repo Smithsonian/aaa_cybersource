@@ -34,7 +34,14 @@ function aaa_cybersource_cron() {
       \Drupal::logger('aaa_cybersource')->warning('There appears to be no matching transaction for payment id ' . $paymentId);
     }
     elseif (!is_array($transaction)) {
-      \Drupal::logger('aaa_cybersource')->error('Trying to match for payment ' . $paymentId . ' led to error:' . $transaction->getResponseBody());
+      // THR: 2025-07-15 - The previous code that had us adding $transcation->getResponseBody() to the log failed, because it wasn't a string
+      // instead, use the message field from the response body
+      $transactionErrorMessage = $transaction->getResponseBody()->message;
+      // Just so we have further information, we're going to also add the URI associated with the CyberSource payment transaction
+      $link = $transaction->getResponseBody()->_links->self->href;
+      $transactionErrorMessage .= '(' . $link . ')';
+      // TODO: add support for invalid and missing fields as a source of error -- need examples for testing
+      \Drupal::logger('aaa_cybersource')->error('Trying to match for payment ' . $paymentId . '(' . $payment->id() . ') led to error: ' . $transactionErrorMessage);
     }
     elseif (isset($transaction[0])) {
       $links = $transaction[0]->getLinks()->getRelatedTransactions();
@@ -92,7 +99,9 @@ function aaa_cybersource_cron() {
     $transaction = $cybersourceClient->getTransaction($paymentId);
 
     if (!is_array($transaction) && get_class($transaction) === 'CyberSource\ApiException') {
-      $message = $transaction->getResponseBody()->message;
+      // Add the payment node ID to the log message, to make it easier to track down the payment if there's an error
+      $message = "Payment ID: " . $payment->id() . "; ";
+      $message .= $transaction->getResponseBody()->message;
       $response_message = $transaction->getMessage();
       \Drupal::logger('aaa_cybersource')->error($message . ' on ' . $response_message . ' ');
 
