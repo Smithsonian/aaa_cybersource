@@ -114,4 +114,44 @@ class Mailer {
     return $result;
   }
 
+  /**
+   * Send a notification email.
+   *
+   * @param string $key
+   *   Email unique key.
+   * @param string $to
+   *   The email address to send the message to.
+   * @param string $subject
+   *   The subject of the message.
+   * @param string $body
+   *   The body of the message.
+   */
+  public function sendNotification($key, $to, $subject, $body) {
+    $global = $this->configFactory->get('aaa_cybersource.settings')->get('global');
+    if (isset($global['receipt_sender']) === TRUE) {
+      $site_mail = $global['receipt_sender'];
+    }
+    else {
+      $site_mail = $this->tokenManager->replace('[site:mail]', NULL, [], []);
+    }
+    $current_langcode = $this->languageManager->getCurrentLanguage()->getId();
+    $site_name = $this->tokenManager->replace('[site:name]', NULL, [], []);
+
+    $result = $this->mailManager->mail(
+      'aaa_cybersource',
+      $key,
+      $to,
+      $current_langcode,
+      [
+        'from_mail' => $site_mail,
+        'from_name' => $site_name,
+        'subject' => $subject,
+        'body' => $body,
+      ],
+      $site_mail,
+    );
+
+    return $result;
+  }
+
 }
