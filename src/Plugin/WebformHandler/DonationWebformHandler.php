@@ -550,7 +550,7 @@ class DonationWebformHandler extends WebformHandlerBase {
       $confirmationMessageId = 'confirmation_message';
       $defaultConfirmationMessage = $this->webform->getSetting($confirmationMessageId, '');
 
-      $message = '<h2>Thank you.</h2><p>Your payment is authorized pending review.</p>';
+      $message = '<h2>Thank you.</h2><p>Your payment is currently processing.</p>';
 
       if ($this->configuration['email_receipt'] === TRUE) {
         $message = $message . PHP_EOL . '<p>You will receive an email copy of your receipt once processed.</p>';
@@ -566,19 +566,42 @@ class DonationWebformHandler extends WebformHandlerBase {
    * {@inheritdoc}
    */
   public function postSave(WebformSubmissionInterface $webform_submission, $update = TRUE) {
+    // Cybersource needs a few seconds before the receipt can be accessed.
+    sleep(5);
+
+    $data = $webform_submission->getData();
+    $payment = $this->entityRepository->getActive('payment', $data['payment_entity']);
     if ($this->configuration['email_receipt'] === TRUE) {
-      // Cybersource needs a few seconds before the receipt can be accessed.
-      sleep(5);
-
-      $data = $webform_submission->getData();
-      $payment = $this->entityRepository->getActive('payment', $data['payment_entity']);
-
       // Only send email in these cases.
       if ($data['status'] === 'AUTHORIZED' || $data['status'] === 'PENDING' || $data['status'] === 'TRANSMITTED') {
         $key = $this->getWebform()->id() . '_' . $this->getHandlerId();
         $to = $this->replaceTokens('[webform_submission:values:email]', $webform_submission, [], []);
         $this->receiptHandler->trySendReceipt($this->cybersourceClient, $payment, $key, $to);
       }
+    }
+
+    if ($data['status'] === 'AUTHORIZED_PENDING_REVIEW') {
+      // Send email notification.
+      $paymentUrl = $payment->toUrl('canonical', ['absolute' => TRUE])->toString();
+      $code = $payment->get('code')->value;
+      $transactionId = $payment->get('transaction_id')->value;
+      $createdTimestamp = (int) $payment->get('created')->value;
+      $created = $this->dateFormatter->format($createdTimestamp, 'custom', 'Y-m-d H:i:s');
+
+      $body = "
+This is an automated email message from the AAA CyberSource Module on aaa.si.edu.
+
+A Payment was submitted to one of your payment forms. The CyberSource payment processor flagged this transaction as AUTHORIZED_PENDING_REVIEW. This means the payer's bank authorized the transfer of funds but the transaction was flagged by the CyberSource Decision Manager.
+
+You may log in to your CyberSource Account and find this transaction to take further action.
+
+Payment details:
+ - Date and time: $created
+ - Payment Entity on AAA.SI.EDU: $paymentUrl
+ - Code/Mechant Reference Number: $code
+ - Transaction Id: $transactionId
+";
+      $this->mailer->sendMail('notification', 'AAAGiving@si.edu', 'Payment on aaa.si.edu flagged. Needs review.', $body);
     }
   }
 

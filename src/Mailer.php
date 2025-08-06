@@ -83,8 +83,10 @@ class Mailer {
    *   The subject of the message.
    * @param string $body
    *   The body of the message.
+   * @param array $options
+   *   Optional information.
    */
-  public function sendMail($key, $to, $subject, $body) {
+  public function sendMail($key, $to, $subject, $body, $options = []) {
     $global = $this->configFactory->get('aaa_cybersource.settings')->get('global');
     $current_langcode = $this->languageManager->getCurrentLanguage()->getId();
     if (isset($global['receipt_sender']) === TRUE) {
@@ -96,18 +98,24 @@ class Mailer {
 
     $site_name = $this->tokenManager->replace('[site:name]', NULL, [], []);
 
+    $mail_params = [
+      'from_mail' => $site_mail,
+      'from_name' => $site_name,
+      'subject' => $subject,
+      'body' => $body,
+    ];
+
+    // Add passed options to the mail params.
+    foreach ($options as $key => $value) {
+      $mail_params[$key] = $value;
+    }
+
     $result = $this->mailManager->mail(
       'aaa_cybersource',
       $key,
       $to,
       $current_langcode,
-      [
-        'from_mail' => $site_mail,
-        'from_name' => $site_name,
-        'subject' => $subject,
-        'body' => $body,
-        'bcc_mail' => 'AAAGiving@si.edu',
-      ],
+      $mail_params,
       $site_mail,
     );
 
