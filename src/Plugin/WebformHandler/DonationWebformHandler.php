@@ -601,7 +601,7 @@ Payment details:
  - Code/Mechant Reference Number: $code
  - Transaction Id: $transactionId
 ";
-      $this->mailer->sendNotification('notification', 'AAAGiving@si.edu', 'Payment on aaa.si.edu flagged. Needs review.', $body);
+      $this->mailer->sendMail('notification', 'AAAGiving@si.edu', 'Payment on aaa.si.edu flagged. Needs review.', $body);
     }
   }
 

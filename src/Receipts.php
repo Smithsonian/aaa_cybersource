@@ -536,7 +536,9 @@ $ {$amount}
       $to = $billTo->getEmail();
     }
 
-    $result = $this->mailer->sendMail($key, $to, $subject, $body);
+    $result = $this->mailer->sendMail($key, $to, $subject, $body, [
+      'bcc_mail' => 'AAAGiving@si.edu',
+    ]);
 
     if ($result['send'] === TRUE) {
       $context = [
