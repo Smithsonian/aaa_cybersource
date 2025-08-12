@@ -552,6 +552,11 @@ class DonationWebformHandler extends WebformHandlerBase {
 
       $message = '<h2>Thank you.</h2><p>Your payment is currently processing.</p>' . PHP_EOL . $defaultConfirmationMessage;
 
+      // Delete message about downloading a copy of the receipt, because this isn't available for pending transactions
+      $message = preg_replace('/You may save.+<\/a>./i','',$message);
+      // Remove extra break tags, since we cleared out the extra text
+      $message = preg_replace('/<br \/>\s*<br \/>+/i','',$message);
+
       if ($this->configuration['email_receipt'] === TRUE) {
         $message = $message . PHP_EOL . '<p>You will receive an email copy of your receipt once processed.</p>';
       }
