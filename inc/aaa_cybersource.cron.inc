@@ -46,7 +46,7 @@ function aaa_cybersource_cron() {
     elseif (isset($transaction[0])) {
       $links = $transaction[0]->getLinks()->getRelatedTransactions();
 
-      if (!is_null($links)) {
+      if (!is_null($links) && count($links)) {
         $href = $links[0]->getHref();
 
         preg_match('/\d+$/', $href, $related_transactions);
